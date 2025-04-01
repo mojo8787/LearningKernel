@@ -1,1737 +1,1363 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+import datetime
+import json
 import plotly.express as px
-from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
-from sklearn.manifold import TSNE
-import io
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-from kernel_utils import compute_kernel_matrix, compute_krein_kernel_matrix, apply_kernel_transformation
-from visualization import plot_kernel_matrix, plot_transformed_data
-from data_generator import generate_sample_data, generate_drug_response_data
+from kernel_utils import (
+    compute_kernel_matrix,
+    compute_krein_kernel_matrix,
+    apply_kernel_transformation,
+    apply_kernel_pca
+)
+from data_generator import generate_sample_data
+from visualization import (
+    plot_kernel_matrix,
+    plot_transformed_data,
+    plot_eigenspectrum,
+    plot_synergy_matrix
+)
+from database import (
+    init_db,
+    get_all_antibiotics,
+    get_all_drug_pairs,
+    get_drug_pairs_as_dataframe,
+    get_all_analysis_results,
+    get_analysis_result_by_id,
+    save_analysis_result,
+    seed_database
+)
 
-# Set page config
+# Initialize database
+init_db()
+
+# Set page configuration
 st.set_page_config(
-    page_title="Kernel Visualization for Antibiotic Synergy",
-    page_icon="🧬",
-    layout="wide"
+    page_title="KreinSynergy: Interactive Exploration of Indefinite Kernels",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Main title
-st.title("Kernel Visualization & Analysis Tool")
-st.subheader("For Antibiotic Synergy Research")
+# Define helper functions
+def get_class_labels(data_type):
+    """Return class labels for different data types"""
+    if data_type == "moons" or data_type == "circles" or data_type == "linearly_separable":
+        return ["Class 0", "Class 1"]
+    elif data_type == "drug_response":
+        return ["Antagonistic", "Additive", "Synergistic"]
+    elif data_type == "bacteria_markers":
+        return ["Sensitive", "Intermediate", "Resistant"]
+    else:
+        return ["Class " + str(i) for i in range(10)]
 
-# Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Select a page", [
-    "What are Kernels?", 
-    "Kernel Types", 
-    "Prof. Gärtner's Research",
-    "Kreĭn Space Mathematics",
-    "Antibiotic Synergy Context",
-    "Interactive Visualizations",
-    "Kernel Matrices", 
-    "Upload Your Data",
-    "Experimental Data Visualization"
-])
+def get_feature_names(data_type):
+    """Return feature names for different data types"""
+    if data_type == "moons" or data_type == "circles" or data_type == "linearly_separable":
+        return ["Feature 1", "Feature 2"]
+    elif data_type == "drug_response":
+        return ["Drug A Conc.", "Drug B Conc.", "Target Inhibition", "Stress Response", "Energy Metabolism"]
+    elif data_type == "bacteria_markers":
+        return ["Drug Target", "Efflux Pump", "Beta-lactamase", "Cell Wall", "Metabolism", "Stress Response"]
+    else:
+        return ["Feature " + str(i+1) for i in range(10)]
 
-# Add repository information
-st.sidebar.markdown("---")
-st.sidebar.markdown("### Project Info")
-st.sidebar.info(
-    "An educational tool for understanding different kernel types "
-    "with applications in antibiotic synergy research."
+# Create the sidebar
+st.sidebar.title("KreinSynergy")
+st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Antibiotic-synergy-testing.png/320px-Antibiotic-synergy-testing.png", use_column_width=True)
+
+# Navigation
+st.sidebar.markdown("## Navigation")
+page = st.sidebar.selectbox(
+    "Choose a page:",
+    ["Home", "Kernel Types Overview", "Kernel Visualization", 
+     "Kreĭn Space Mathematics", "Biological Context", 
+     "Experimental Data", "Save & Load Analysis"]
 )
 
-# What are Kernels page
-if page == "What are Kernels?":
-    st.header("What are Kernels?")
+# Page: Home
+if page == "Home":
+    st.title("KreinSynergy: Interactive Exploration of Indefinite Kernels for Antibiotic Synergy Research")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.markdown("""
-        ### Definition
-        A kernel is a mathematical function that measures the similarity between pairs of data points. 
-        It acts as a "bridge" to analyze complex relationships in data without explicitly computing 
-        coordinates in high-dimensional space.
+        ## Welcome to KreinSynergy
+
+        This interactive application demonstrates the power of Kreĭn space kernels for analyzing complex biological data, 
+        with a focus on antibiotic synergy research. The application bridges the gap between machine learning theory and 
+        microbiology applications.
         
-        ### Key Idea
-        Kernels allow you to work in a higher-dimensional space while doing all computations in the original 
-        input space. This avoids the "curse of dimensionality" and makes complex problems computationally tractable.
+        ### What are Kreĭn Space Kernels?
         
-        ### Why Kernels Matter for Antibiotic Synergy Research
+        Kreĭn space kernels are a class of indefinite kernels that can represent both similarity and dissimilarity 
+        relationships in data. Unlike traditional positive definite kernels, Kreĭn kernels can model complex relationships 
+        in biological systems where both cooperation and antagonism exist simultaneously.
         
-        #### 1. Handling Non-Euclidean Relationships
-        Biological systems (e.g., bacterial stress-response networks) often have relationships that can't be 
-        captured by standard "flat" (Euclidean) geometry.
+        ### Connection to Antibiotic Synergy
         
-        **Example**: Two antibiotics might disrupt different pathways, but their combined effect creates a 
-        non-linear interaction (e.g., one drug amplifies the stress caused by the other). Kernels can model 
-        these interactions.
+        Antibiotic synergy occurs when the combined effect of two antibiotics is greater than the sum of their individual 
+        effects. This phenomenon is crucial for treating resistant bacterial infections, but the underlying mechanisms are 
+        complex and not fully understood. Kreĭn kernels provide a mathematical framework to model these complex interactions.
         
-        #### 2. Indefinite Similarity Measures
-        Traditional kernels require similarity measures to be positive definite (always non-negative). 
-        Kreĭn-space kernels relax this constraint, allowing indefinite similarities.
+        ### Application Areas:
         
-        **Why this matters**: Bacterial stress responses might involve conflicting signals (e.g., oxidative 
-        stress vs. nutrient deprivation). Kreĭn kernels can model these opposing dynamics.
+        - **Drug Combination Optimization**: Finding optimal antibiotic combinations for treating resistant infections
+        - **Mechanism Understanding**: Exploring underlying biochemical mechanisms of drug synergy
+        - **Resistance Pattern Analysis**: Identifying patterns in bacterial resistance to multiple antibiotics
+        - **Drug Discovery**: Guiding the development of new antibiotics designed to work synergistically
         
-        #### 3. Interpretability
-        Kernel methods (like SVMs) produce models where predictions depend on weighted combinations of 
-        similarities to training examples. This makes it easier to trace which biological features drive predictions.
+        ### About This Project
+        
+        This application was created as part of a research project exploring the applications of advanced kernel methods 
+        in microbiological research, specifically focusing on the work of Professor Thomas Gärtner on indefinite kernels
+        and their biological applications.
         """)
     
     with col2:
-        st.markdown("### The Kernel Trick")
-        
-        # Simple illustration of kernel trick
-        x = np.linspace(-5, 5, 100)
-        y1 = np.where(x < 0, 1, -1)
-        y2 = np.where(x**2 < 5, 1, -1)
-        
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(5, 6))
-        
-        # Linear case (not separable)
-        ax1.scatter(x, np.zeros_like(x), c=y1, cmap='coolwarm', s=20)
-        ax1.set_title('Linear Space (Not Separable)')
-        ax1.set_ylim(-0.5, 0.5)
-        ax1.set_xlabel('x')
-        ax1.set_yticks([])
-        
-        # Transformed with kernel (separable)
-        ax2.scatter(x, x**2, c=y2, cmap='coolwarm', s=20)
-        ax2.set_title('Kernel-Transformed Space (Separable)')
-        ax2.set_xlabel('x')
-        ax2.set_ylabel('x²')
-        
-        st.pyplot(fig)
-        
         st.markdown("""
-        The "kernel trick" transforms data into a higher-dimensional space where complex patterns 
-        become more apparent and easier to separate.
+        ### Quick Navigation
+        
+        - [Kernel Types Overview](#kernel-types-overview)
+        - [Kernel Visualization](#kernel-visualization)
+        - [Kreĭn Space Mathematics](#kreĭn-space-mathematics)
+        - [Biological Context](#biological-context)
+        - [Experimental Data](#experimental-data)
+        - [Save & Load Analysis](#save-load-analysis)
+        
+        ### About the Creator
+        
+        This tool was developed by a microbiologist with an interest in applying advanced computational methods to 
+        biological problems. As a potential postdoc candidate, this project demonstrates interdisciplinary skills 
+        bridging microbiology and machine learning.
+        
+        ### Learn More
+        
+        For more information on Kreĭn space kernels and their applications in computational biology, check out:
+        
+        - [Thomas Gärtner's Research](https://ml-tuw.github.io/people/thomas-gaertner/)
+        - [Learning with Indefinite Kernels](https://doi.org/10.1109/TPAMI.2012.189)
+        - [Learning with Non-positive Kernels](https://doi.org/10.1145/1015330.1015443)
         """)
-
-# Kernel Types page
-elif page == "Kernel Types":
-    st.header("Types of Kernels")
+    
+    st.markdown("---")
     
     st.markdown("""
-    Different kernel functions capture different types of similarities between data points.
-    Below are some common kernels relevant to antibiotic synergy research:
+    ### Professor Thomas Gärtner's Research and Its Relevance to Antibiotic Synergy
+    
+    Professor Thomas Gärtner is a leading researcher in the field of machine learning, with a focus on kernels, graphs, and their applications. His work on indefinite kernels, particularly in Kreĭn spaces, has significant implications for modeling complex biological interactions like antibiotic synergy.
+    
+    #### Key Research Contributions:
+    
+    1. **Indefinite Kernel Learning**: Developing methods for learning with indefinite kernels, which is critical for modeling data with both similarity and dissimilarity relationships.
+    
+    2. **Graph Kernels**: Pioneering work on kernels for structured data like molecular graphs, which allows for sophisticated analysis of antibiotic structures and their interactions.
+    
+    3. **Kreĭn Space Methods**: Advancing the theoretical understanding of learning in Kreĭn spaces, providing a solid mathematical foundation for analyzing complex biological interactions.
+    
+    #### Relevance to Antibiotic Synergy Research:
+    
+    Antibiotic synergy is a complex phenomenon involving multiple biological pathways, molecular interactions, and cellular responses. Traditional positive definite kernels can model similarity relationships but struggle with the antagonistic relationships that are also present in drug interactions. Kreĭn kernels, on the other hand, can naturally represent both types of relationships, making them ideal for modeling antibiotic synergy.
+    
+    By applying Kreĭn space methods to antibiotic interaction data, researchers can gain new insights into:
+    
+    - The mechanisms underlying synergistic effects
+    - Patterns of cross-resistance and cross-susceptibility
+    - Optimal drug combinations for specific bacterial strains
+    - Novel targets for antibiotic development
+    
+    This application aims to bring these advanced mathematical concepts to microbiologists in an accessible, interactive format, facilitating interdisciplinary research in this important area.
+    """)
+
+# Page: Kernel Types Overview
+elif page == "Kernel Types Overview":
+    st.title("Kernel Types Overview")
+    
+    st.markdown("""
+    ### Introduction to Kernels in Machine Learning
+    
+    Kernel methods are a class of algorithms for pattern analysis, whose best-known member is the Support Vector Machine (SVM).
+    The general task of pattern analysis is to find and study general types of relations (e.g. clusters, rankings, principal 
+    components, correlations, classifications) in datasets.
+    
+    A kernel function is a similarity measure between two points. Mathematically, it corresponds to an inner product in a 
+    (possibly infinite-dimensional) feature space.
+    
+    ### Common Kernel Types
     """)
     
-    kernel_tabs = st.tabs(["Linear Kernel", "RBF Kernel", "Graph Kernel", "Kreĭn-Space Kernel"])
+    kernel_types = {
+        "Linear Kernel": {
+            "formula": "K(x, y) = x^T y",
+            "description": "The simplest kernel function. It's equivalent to the dot product in the original space. Linear kernels are useful when the data is already linearly separable.",
+            "parameters": None,
+            "applications": "Document classification, simple regression tasks"
+        },
+        "Polynomial Kernel": {
+            "formula": "K(x, y) = (γx^T y + c)^d",
+            "description": "Maps data into a higher-dimensional space where γ, c, and d are parameters. This kernel can capture interactions between features up to degree d.",
+            "parameters": "γ (gamma), c (coef0), d (degree)",
+            "applications": "Image processing, natural language processing"
+        },
+        "RBF Kernel (Gaussian)": {
+            "formula": "K(x, y) = exp(-γ||x - y||^2)",
+            "description": "The Radial Basis Function kernel is one of the most popular kernels. It can map into an infinite-dimensional space and works well for most problems when you're not sure which kernel to use.",
+            "parameters": "γ (gamma)",
+            "applications": "General purpose, works well for most classification and regression tasks"
+        },
+        "Sigmoid Kernel": {
+            "formula": "K(x, y) = tanh(γx^T y + c)",
+            "description": "Also known as the hyperbolic tangent kernel, it is related to neural networks. This kernel is not positive definite for all parameter values.",
+            "parameters": "γ (gamma), c (coef0)",
+            "applications": "Neural networks, binary classification"
+        },
+        "Kreĭn Kernel (Indefinite)": {
+            "formula": "K(x, y) = K₊(x, y) - K₋(x, y)",
+            "description": "Kreĭn kernels are a difference of two positive definite kernels, allowing them to model both similarity and dissimilarity. They can capture complex patterns that positive definite kernels cannot.",
+            "parameters": "Parameters for K₊ and K₋, plus the weight for K₋",
+            "applications": "Biological networks, drug interaction analysis, anomaly detection"
+        }
+    }
     
-    with kernel_tabs[0]:
-        st.markdown("""
-        ### Linear Kernel
-        
-        **Formula**: $K(x, y) = x^T y$
-        
-        **Properties**:
-        - Simplest kernel function
-        - Equivalent to dot product in the input space
-        - No transformation to higher dimensions
-        
-        **Use Case in Antibiotic Research**:
-        - Baseline for comparing simple relationships (e.g., additive drug effects)
-        - When effects are expected to be proportional to concentrations
-        - For initial exploration of data
-        """)
-        
-        # Simple visualization
-        x = np.linspace(-5, 5, 100)
-        y = np.linspace(-5, 5, 100)
-        X, Y = np.meshgrid(x, y)
-        Z = X * Y  # Linear kernel: dot product
-        
-        fig = go.Figure(data=[go.Surface(z=Z, x=x, y=y)])
-        fig.update_layout(
-            title='Linear Kernel Visualization',
-            scene=dict(
-                xaxis_title='x',
-                yaxis_title='y',
-                zaxis_title='K(x,y)'
-            ),
-            width=600,
-            height=500
+    for kernel_name, kernel_info in kernel_types.items():
+        with st.expander(f"{kernel_name}"):
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                st.markdown(f"**Formula:** {kernel_info['formula']}")
+                
+                if kernel_info['parameters']:
+                    st.markdown(f"**Parameters:** {kernel_info['parameters']}")
+                else:
+                    st.markdown("**Parameters:** None")
+            
+            with col2:
+                st.markdown(f"**Description:** {kernel_info['description']}")
+                st.markdown(f"**Applications:** {kernel_info['applications']}")
+    
+    st.markdown("""
+    ### Positive Definite vs. Indefinite Kernels
+    
+    Kernels can be categorized as either positive definite or indefinite:
+    
+    **Positive Definite Kernels:**
+    - The kernel matrix has all non-negative eigenvalues
+    - They correspond to an inner product in some Hilbert space
+    - Examples: Linear, Polynomial, RBF (Gaussian)
+    - Well-behaved mathematically with strong theoretical guarantees
+    
+    **Indefinite Kernels:**
+    - The kernel matrix has both positive and negative eigenvalues
+    - They correspond to an inner product in Kreĭn space (difference of two Hilbert spaces)
+    - Examples: Sigmoid (for certain parameters), Kreĭn kernels
+    - Can capture more complex relationships, but pose theoretical challenges
+    
+    ### Why Indefinite Kernels Matter for Biological Data
+    
+    Biological interactions are often complex and involve both cooperative and competitive relationships. For example, in antibiotic synergy:
+    
+    - Some drug combinations enhance each other's effects (synergy)
+    - Some drug combinations reduce each other's effects (antagonism)
+    - Some pathways might be promoted while others are inhibited
+    
+    Indefinite kernels, particularly Kreĭn kernels, can naturally represent these mixed relationships, making them powerful tools for analyzing complex biological systems.
+    """)
+
+# Page: Kernel Visualization
+elif page == "Kernel Visualization":
+    st.title("Kernel Visualization")
+    
+    # Data generation parameters
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    
+    with col1:
+        data_type = st.selectbox(
+            "Select data type:",
+            ["moons", "circles", "linearly_separable", "drug_response", "bacteria_markers"]
+        )
+    
+    with col2:
+        n_samples = st.slider("Number of samples:", min_value=10, max_value=500, value=100, step=10)
+    
+    with col3:
+        noise = st.slider("Noise level:", min_value=0.0, max_value=1.0, value=0.1, step=0.05)
+    
+    with col4:
+        random_state = st.number_input("Random seed:", value=42, min_value=0, max_value=1000, step=1)
+    
+    # Generate data
+    np.random.seed(random_state)
+    X, y = generate_sample_data(data_type, n_samples=n_samples, noise=noise)
+    
+    # Display data info
+    st.markdown(f"**Generated {data_type} data with {X.shape[0]} samples, {X.shape[1]} features, and {len(np.unique(y))} classes**")
+    
+    # Feature names based on data type
+    feature_names = get_feature_names(data_type)
+    class_labels = get_class_labels(data_type)
+    
+    # Display original data (if 2D)
+    if X.shape[1] <= 2:
+        fig = px.scatter(
+            x=X[:, 0], 
+            y=X[:, 1] if X.shape[1] > 1 else np.zeros(X.shape[0]),
+            color=[class_labels[i] for i in y],
+            labels={'x': feature_names[0], 'y': feature_names[1] if X.shape[1] > 1 else ''},
+            title=f"Original {data_type.capitalize()} Data"
         )
         st.plotly_chart(fig)
+    else:
+        st.markdown(f"**Note:** Original data has {X.shape[1]} dimensions, displaying transformed views below.")
     
-    with kernel_tabs[1]:
-        st.markdown("""
-        ### Radial Basis Function (RBF) Kernel
-        
-        **Formula**: $K(x, y) = exp(-\\gamma ||x - y||^2)$
-        
-        **Properties**:
-        - Measures similarity based on distance
-        - Maps to infinite-dimensional space
-        - Controlled by $\\gamma$ parameter (width)
-        
-        **Use Case in Antibiotic Research**:
-        - Capturing non-linear similarities in omics data (e.g., transcriptomic profiles)
-        - Modeling complex drug-target interactions
-        - Clustering similar antibiotic response patterns
-        """)
-        
-        # RBF visualization
-        gamma = st.slider("Gamma parameter", 0.1, 2.0, 0.5, 0.1)
-        
-        x = np.linspace(-5, 5, 100)
-        y = np.linspace(-5, 5, 100)
-        X, Y = np.meshgrid(x, y)
-        Z = np.exp(-gamma * (X**2 + Y**2))
-        
-        fig = go.Figure(data=[go.Surface(z=Z, x=x, y=y)])
-        fig.update_layout(
-            title=f'RBF Kernel Visualization (γ={gamma})',
-            scene=dict(
-                xaxis_title='x',
-                yaxis_title='y',
-                zaxis_title='K(x,y)'
-            ),
-            width=600,
-            height=500
+    # Kernel selection
+    st.markdown("### Select Kernels to Compare")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        kernel1_type = st.selectbox(
+            "Kernel 1 type:",
+            ["linear", "rbf", "polynomial", "sigmoid", "kreĭn"],
+            key="kernel1_type"
         )
-        st.plotly_chart(fig)
-    
-    with kernel_tabs[2]:
-        st.markdown("""
-        ### Graph Kernel
         
-        **Concept**: Measures similarity between graphs representing biological networks
+        # Parameters for kernel 1
+        if kernel1_type == "rbf":
+            k1_gamma = st.slider("Gamma (kernel 1):", min_value=0.01, max_value=5.0, value=1.0, step=0.1, key="k1_gamma")
+            kernel1_params = {"gamma": k1_gamma}
         
-        **Properties**:
-        - Compares substructures within graphs
-        - Can capture pathway similarities
-        - Various types: random walk, shortest path, etc.
+        elif kernel1_type == "polynomial":
+            k1_degree = st.slider("Degree (kernel 1):", min_value=1, max_value=10, value=3, step=1, key="k1_degree")
+            k1_gamma = st.slider("Gamma (kernel 1):", min_value=0.01, max_value=5.0, value=1.0, step=0.1, key="k1_gamma")
+            k1_coef0 = st.slider("Coef0 (kernel 1):", min_value=0.0, max_value=5.0, value=1.0, step=0.1, key="k1_coef0")
+            kernel1_params = {"degree": k1_degree, "gamma": k1_gamma, "coef0": k1_coef0}
         
-        **Use Case in Antibiotic Research**:
-        - Modeling pathway crosstalk as networks (e.g., protein-protein interaction networks)
-        - Comparing drug effects on biological network perturbations
-        - Analyzing pathway disruption patterns
-        """)
+        elif kernel1_type == "sigmoid":
+            k1_gamma = st.slider("Gamma (kernel 1):", min_value=0.01, max_value=5.0, value=1.0, step=0.1, key="k1_gamma")
+            k1_coef0 = st.slider("Coef0 (kernel 1):", min_value=0.0, max_value=5.0, value=1.0, step=0.1, key="k1_coef0")
+            kernel1_params = {"gamma": k1_gamma, "coef0": k1_coef0}
         
-        # Create a simple graph visualization
-        plt.figure(figsize=(6, 4))
-        
-        # Create a simple graph with nodes and edges
-        G_nodes = np.array([[0.1, 0.1], [0.5, 0.5], [0.9, 0.9], [0.1, 0.9], [0.9, 0.1]])
-        G_edges = [(0, 1), (1, 2), (3, 1), (1, 4)]
-        
-        # Plot the graph
-        plt.scatter(G_nodes[:, 0], G_nodes[:, 1], s=100, c='blue')
-        for i, j in G_edges:
-            plt.plot([G_nodes[i, 0], G_nodes[j, 0]], [G_nodes[i, 1], G_nodes[j, 1]], 'k-')
+        elif kernel1_type == "kreĭn":
+            k1_pos_gamma = st.slider("Positive component gamma (kernel 1):", min_value=0.01, max_value=5.0, value=0.5, step=0.1, key="k1_pos_gamma")
+            k1_neg_weight = st.slider("Negative component weight (kernel 1):", min_value=0.0, max_value=1.0, value=0.3, step=0.05, key="k1_neg_weight")
+            kernel1_params = {"pos_gamma": k1_pos_gamma, "neg_weight": k1_neg_weight}
             
-        plt.title("Simple Graph Structure")
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.axis('off')
+        else:  # linear kernel doesn't need parameters
+            kernel1_params = {}
+    
+    with col2:
+        kernel2_type = st.selectbox(
+            "Kernel 2 type:",
+            ["linear", "rbf", "polynomial", "sigmoid", "kreĭn"],
+            index=4,  # Default to kreĭn for kernel 2
+            key="kernel2_type"
+        )
         
-        # Create a second graph with a different structure
-        plt.figure(figsize=(6, 4))
-        H_nodes = np.array([[0.1, 0.5], [0.3, 0.8], [0.5, 0.5], [0.7, 0.8], [0.9, 0.5]])
-        H_edges = [(0, 2), (1, 2), (2, 3), (2, 4)]
+        # Parameters for kernel 2
+        if kernel2_type == "rbf":
+            k2_gamma = st.slider("Gamma (kernel 2):", min_value=0.01, max_value=5.0, value=1.0, step=0.1, key="k2_gamma")
+            kernel2_params = {"gamma": k2_gamma}
         
-        # Plot the second graph
-        plt.scatter(H_nodes[:, 0], H_nodes[:, 1], s=100, c='green')
-        for i, j in H_edges:
-            plt.plot([H_nodes[i, 0], H_nodes[j, 0]], [H_nodes[i, 1], H_nodes[j, 1]], 'k-')
+        elif kernel2_type == "polynomial":
+            k2_degree = st.slider("Degree (kernel 2):", min_value=1, max_value=10, value=3, step=1, key="k2_degree")
+            k2_gamma = st.slider("Gamma (kernel 2):", min_value=0.01, max_value=5.0, value=1.0, step=0.1, key="k2_gamma")
+            k2_coef0 = st.slider("Coef0 (kernel 2):", min_value=0.0, max_value=5.0, value=1.0, step=0.1, key="k2_coef0")
+            kernel2_params = {"degree": k2_degree, "gamma": k2_gamma, "coef0": k2_coef0}
+        
+        elif kernel2_type == "sigmoid":
+            k2_gamma = st.slider("Gamma (kernel 2):", min_value=0.01, max_value=5.0, value=1.0, step=0.1, key="k2_gamma")
+            k2_coef0 = st.slider("Coef0 (kernel 2):", min_value=0.0, max_value=5.0, value=1.0, step=0.1, key="k2_coef0")
+            kernel2_params = {"gamma": k2_gamma, "coef0": k2_coef0}
+        
+        elif kernel2_type == "kreĭn":
+            k2_pos_gamma = st.slider("Positive component gamma (kernel 2):", min_value=0.01, max_value=5.0, value=0.5, step=0.1, key="k2_pos_gamma")
+            k2_neg_weight = st.slider("Negative component weight (kernel 2):", min_value=0.0, max_value=1.0, value=0.3, step=0.05, key="k2_neg_weight")
+            kernel2_params = {"pos_gamma": k2_pos_gamma, "neg_weight": k2_neg_weight}
             
-        plt.title("Another Graph Structure")
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.axis('off')
-        
-        # Display both graphs
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(plt.figure(1))
-        with col2:
-            st.pyplot(plt.figure(2))
-        
-        st.markdown("""
-        **Graph kernels** measure similarity between these network structures by comparing:
-        - Node patterns
-        - Connection patterns
-        - Subgraph structures
-        
-        This is ideal for comparing pathway networks in biological systems.
-        """)
-        
-        st.markdown("""
-        *Note: Graph kernels compare similarities between network structures, which is particularly useful 
-        when modeling how antibiotics affect cellular pathways and their interactions.*
-        """)
+        else:  # linear kernel doesn't need parameters
+            kernel2_params = {}
     
-    with kernel_tabs[3]:
-        st.markdown("""
-        ### Kreĭn-Space Kernel
+    # Compute kernel matrices
+    K1 = compute_kernel_matrix(X, kernel1_type, **kernel1_params)
+    K2 = compute_kernel_matrix(X, kernel2_type, **kernel2_params)
+    
+    # Plot kernel matrices
+    st.markdown("### Kernel Matrix Comparison")
+    
+    fig = plot_kernel_matrix(K1, K2, kernel1_type.capitalize(), kernel2_type.capitalize(), y)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Display eigenvalue spectrum for both kernels
+    st.markdown("### Eigenvalue Spectrum")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig = plot_eigenspectrum(K1, kernel1_type.capitalize())
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        fig = plot_eigenspectrum(K2, kernel2_type.capitalize())
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Apply kernel transformations to data
+    st.markdown("### Data Transformation with Kernels")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Transform with kernel 1
+        X_transformed_1 = apply_kernel_transformation(X, kernel1_type, **kernel1_params)
+        fig = plot_transformed_data(X, X_transformed_1, y, kernel1_type.capitalize(), data_type.capitalize())
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Transform with kernel 2
+        X_transformed_2 = apply_kernel_transformation(X, kernel2_type, **kernel2_params)
+        fig = plot_transformed_data(X, X_transformed_2, y, kernel2_type.capitalize(), data_type.capitalize())
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Save analysis button
+    st.markdown("### Save This Analysis")
+    
+    col1, col2 = st.columns([1, 3])
+    
+    with col1:
+        save_name = st.text_input("Analysis name:", value=f"{data_type}_{kernel1_type}_vs_{kernel2_type}")
+    
+    with col2:
+        save_description = st.text_input("Description:", value=f"Comparison of {kernel1_type} and {kernel2_type} kernels on {data_type} data")
+    
+    if st.button("Save Analysis"):
+        analysis_data = {
+            "data_type": data_type,
+            "n_samples": n_samples,
+            "noise": noise,
+            "random_state": random_state,
+            "kernel1_type": kernel1_type,
+            "kernel1_params": kernel1_params,
+            "kernel2_type": kernel2_type,
+            "kernel2_params": kernel2_params,
+            "X": X.tolist(),
+            "y": y.tolist()
+        }
         
-        **Concept**: Extends traditional kernels to handle indefinite similarities
+        created_at = datetime.datetime.now().isoformat()
         
-        **Properties**:
-        - Works in spaces with indefinite inner products
-        - Can represent both positive and negative similarities
-        - Generalizes traditional positive definite kernels
+        # Save to database
+        result_id = save_analysis_result(
+            name=save_name,
+            description=save_description,
+            kernel_type=f"{kernel1_type}_vs_{kernel2_type}",
+            kernel_params={"kernel1": kernel1_params, "kernel2": kernel2_params},
+            visualization_data=analysis_data,
+            created_at=created_at
+        )
         
-        **Use Case in Antibiotic Research**:
-        - Handling indefinite similarities in dynamic systems (e.g., conflicting stress-response signals)
-        - Modeling antagonistic drug interactions
-        - Representing competing biological pathways
-        """)
-        
-        st.markdown("""
-        #### Kreĭn Kernels vs. Traditional Kernels
-        
-        | Feature | Traditional Kernel (e.g., RBF) | Kreĭn-Space Kernel |
-        |---------|--------------------------------|-------------------|
-        | Similarity Type | Positive definite | Indefinite (can handle negative/"conflicting" similarities) |
-        | Biological Use Case | Static relationships | Dynamic, conflicting stress responses |
-        | Math Foundation | Hilbert space | Kreĭn space (allows indefinite inner products) |
-        
-        *Kreĭn-space methods can represent bacterial stress-response trajectories as dynamic graphs, 
-        where nodes are pathways and edges represent crosstalk under drug pressure.*
-        """)
+        st.success(f"Analysis saved with ID: {result_id}")
 
-# Professor Gärtner's Research page
-elif page == "Prof. Gärtner's Research":
-    st.header("Professor Thomas Gärtner's Research")
-    
-    st.markdown("""
-    ### Background
-    
-    Professor Thomas Gärtner is a recognized expert in machine learning, particularly in the 
-    development of innovative kernel methods and their applications. His research focuses on 
-    learning with non-vectorial data, kernels for structured data, and learning in 
-    non-standard spaces such as Kreĭn spaces.
-    
-    ### Key Research Areas
-    
-    #### 1. Indefinite Learning and Kreĭn Space Methods
-    
-    Professor Gärtner's group has made significant contributions to kernel methods in indefinite spaces. 
-    Traditional kernel methods assume that similarities between objects are represented by positive definite 
-    kernels, which correspond to inner products in Hilbert spaces. However, many real-world similarity 
-    measures are indefinite, meaning they don't satisfy the positive definiteness property.
-    
-    Kreĭn spaces provide a mathematical framework for working with such indefinite kernels:
-    
-    - They decompose into a positive and negative part: K = K₊ - K₋
-    - Allow the modeling of both "attraction" and "repulsion" between data points
-    - Enable the representation of complex antagonistic relationships
-    
-    #### 2. Constructive Machine Learning
-    
-    Another focus of Prof. Gärtner's work is on constructive machine learning methods. This approach:
-    
-    - Emphasizes building interpretable models by constructing meaningful features
-    - Integrates domain knowledge into the learning process
-    - Creates models that not only predict but also explain
-    
-    #### 3. Applications to Biological Systems
-    
-    His group has applied these methods to biological systems, including:
-    
-    - Analyzing protein-protein interaction networks
-    - Predicting drug-target interactions
-    - Modeling complex pathway inhibition patterns
-    
-    ### Relevance to Antibiotic Synergy Research
-    
-    The application of Kreĭn-space methods to antibiotic synergy is particularly promising because:
-    
-    1. **Complex Interactions**: Antibiotics can interact in ways that are neither purely synergistic nor 
-    antagonistic, but involve elements of both. Kreĭn spaces naturally model such complexity.
-    
-    2. **Network Effects**: Antibiotics disrupt bacterial cellular networks in ways that propagate through 
-    interconnected pathways. Graph kernels in Kreĭn spaces can capture these network-level effects.
-    
-    3. **Mechanistic Understanding**: Unlike black-box approaches, kernel methods provide a way to 
-    interpret models in terms of similarities to known examples, enabling researchers to gain 
-    mechanistic insights.
-    """)
-    
-    # Citation and publications
-    st.subheader("Selected Publications")
-    
-    st.markdown("""
-    1. Oglic, D., & Gärtner, T. (2018). Learning in Reproducing Kernel Kreĭn Spaces. *International Conference on Machine Learning (ICML)*.
-    
-    2. Loosli, G., Canu, S., & Gärtner, T. (2016). Indefinite Proximities for SVM Classification. *ESANN*.
-    
-    3. Oglic, D., & Gärtner, T. (2019). Scalable Learning in Reproducing Kernel Krein Spaces. *International Conference on Machine Learning (ICML)*.
-    
-    4. Gärtner, T., Le, Q.V., & Smola, A.J. (2006). A short tour of kernel methods for graphs. *Technical report*.
-    """)
-
-# Kreĭn Space Mathematics page
+# Page: Kreĭn Space Mathematics
 elif page == "Kreĭn Space Mathematics":
-    st.header("Mathematical Theory of Kreĭn Spaces")
+    st.title("Kreĭn Space Mathematics")
     
     st.markdown("""
-    ### Fundamentals of Kreĭn Spaces
+    ### Understanding Kreĭn Spaces
     
-    A Kreĭn space K is a vector space equipped with an indefinite inner product that can be decomposed 
-    into the difference of two positive definite inner products.
+    A Kreĭn space is a special type of vector space that generalizes the concept of Hilbert spaces by allowing for indefinite inner products. 
+    This mathematical structure is particularly useful for modeling complex systems with both positive and negative interactions.
     
     #### Definition
     
-    A Kreĭn space is a vector space K with an indefinite inner product ⟨·,·⟩ₖ that can be written as:
+    A Kreĭn space $K$ can be decomposed as:
     
-    $$⟨x, y⟩_K = ⟨x, y⟩_{H_+} - ⟨x, y⟩_{H_-}$$
+    $$K = K_+ \oplus K_-$$
     
-    where (H₊, ⟨·,·⟩_{H_+}) and (H₋, ⟨·,·⟩_{H_-}) are Hilbert spaces with positive definite inner products.
+    where $K_+$ and $K_-$ are Hilbert spaces, and the inner product in $K$ is defined as:
     
-    #### Key Properties
+    $$\langle x, y \rangle_K = \langle x_+, y_+ \rangle_{K_+} - \langle x_-, y_- \rangle_{K_-}$$
     
-    1. **Indefiniteness**: Unlike Hilbert spaces, inner products in Kreĭn spaces can be negative.
+    where $x = x_+ + x_-$ and $y = y_+ + y_-$ with $x_+, y_+ \in K_+$ and $x_-, y_- \in K_-$.
     
-    2. **Fundamental Decomposition**: Any Kreĭn space can be decomposed as K = K₊ ⊕ K₋, where K₊ and K₋ are Hilbert spaces.
+    #### Kreĭn Kernels
     
-    3. **J-Symmetry**: There exists a "fundamental symmetry" operator J such that ⟨x, y⟩ₖ = ⟨Jx, y⟩ₕ, where ⟨·,·⟩ₕ is a Hilbert space inner product.
+    A Kreĭn kernel $\kappa$ is a function that can be decomposed as:
+    
+    $$\kappa(x, y) = \kappa_+(x, y) - \kappa_-(x, y)$$
+    
+    where $\kappa_+$ and $\kappa_-$ are positive definite kernels.
     """)
     
-    # Visualize the concept of Kreĭn space
-    st.subheader("Geometric Interpretation")
+    # Interactive demonstration
+    st.markdown("### Interactive Demonstration: Building a Kreĭn Kernel")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # Create a visual representation of Hilbert space (positive definite)
-        plt.figure(figsize=(5, 5))
-        
-        # Generate some points in 2D space
-        np.random.seed(42)
-        X = np.random.randn(50, 2)
-        
-        # Plot points and vectors
-        plt.scatter(X[:, 0], X[:, 1], s=30, alpha=0.5)
-        
-        # Draw some vectors
-        for i in range(5):
-            x = X[i]
-            plt.arrow(0, 0, x[0], x[1], head_width=0.1, head_length=0.1, fc='blue', ec='blue')
-        
-        plt.title("Hilbert Space (Positive Definite)")
-        plt.xlim(-3, 3)
-        plt.ylim(-3, 3)
-        plt.grid(True)
-        plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
-        plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
-        
-        st.pyplot(plt.gcf())
-    
-    with col2:
-        # Create a visual representation of Kreĭn space (indefinite)
-        plt.figure(figsize=(5, 5))
-        
-        # Generate some points in 2D space
-        np.random.seed(42)
-        X = np.random.randn(50, 2)
-        
-        # Plot points and vectors
-        plt.scatter(X[:, 0], X[:, 1], s=30, alpha=0.5)
-        
-        # Draw vectors with sign information
-        for i in range(5):
-            x = X[i]
-            # Color based on inner product sign
-            sign = 1 if x[0]*x[0] - x[1]*x[1] > 0 else -1
-            color = 'green' if sign > 0 else 'red'
-            plt.arrow(0, 0, x[0], x[1], head_width=0.1, head_length=0.1, fc=color, ec=color)
-        
-        plt.title("Kreĭn Space (Indefinite)")
-        plt.xlim(-3, 3)
-        plt.ylim(-3, 3)
-        plt.grid(True)
-        plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
-        plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
-        
-        st.pyplot(plt.gcf())
-    
-    st.markdown("""
-    ### Kreĭn Space Kernels
-    
-    A Kreĭn space kernel is a function K: X × X → ℝ such that:
-    
-    1. It can be decomposed as K = K₊ - K₋, where K₊ and K₋ are positive definite kernels.
-    2. For any finite set of points {x₁, x₂, ..., xₙ}, the matrix [K(xᵢ, xⱼ)]ᵢⱼ has a finite number of negative eigenvalues.
-    
-    #### Mathematical Formulation
-    
-    For a Kreĭn space kernel K:
-    
-    $$K(x, y) = K_+(x, y) - K_-(x, y)$$
-    
-    Where K₊ and K₋ are positive definite kernels corresponding to Hilbert spaces H₊ and H₋.
-    
-    #### Support Vector Machines in Kreĭn Spaces
-    
-    The objective function for SVMs in Kreĭn spaces becomes:
-    
-    $$\min_{f \in \mathcal{H}_K} \frac{1}{2} ||f||^2_K + C \sum_{i=1}^n \max(0, 1 - y_i f(x_i))$$
-    
-    where ||f||²ₖ = ||f₊||²_{H₊} - ||f₋||²_{H₋} is the squared norm in the Kreĭn space.
-    
-    This formulation allows for modeling complex decision boundaries that might be impossible 
-    with standard positive definite kernels.
-    """)
-    
-    st.subheader("Applications to Antibiotic Synergy")
-    
-    st.markdown("""
-    In the context of antibiotic synergy, Kreĭn space kernels enable:
-    
-    1. **Modeling Antagonistic Interactions**: The negative part of the kernel (K₋) can represent 
-    antagonistic effects between drugs.
-    
-    2. **Capturing Complex Dynamics**: The interplay between synergistic and antagonistic components 
-    can model the complex dynamics of bacterial stress responses.
-    
-    3. **Improved Classification**: By allowing indefinite similarities, Kreĭn-SVMs can better classify 
-    drug combinations as synergistic, additive, or antagonistic.
-    """)
-    
-    # Example visualization of decision boundary
-    st.subheader("Visualizing Decision Boundaries")
-    
-    # Generate some data
-    np.random.seed(42)
-    X1 = np.random.randn(50, 2) * 0.7 + np.array([2, 2])  # Class 1
-    X2 = np.random.randn(50, 2) * 0.7 + np.array([-2, -2])  # Class 2
-    X3 = np.random.randn(50, 2) * 0.7 + np.array([2, -2])  # Class 3
-    
-    X = np.vstack([X1, X2, X3])
-    y = np.hstack([np.zeros(50), np.ones(50), 2 * np.ones(50)])
-    
-    # Create a plot with decision regions
-    plt.figure(figsize=(10, 6))
-    
-    # Plot points
-    plt.scatter(X1[:, 0], X1[:, 1], c='blue', label='Synergistic')
-    plt.scatter(X2[:, 0], X2[:, 1], c='red', label='Antagonistic')
-    plt.scatter(X3[:, 0], X3[:, 1], c='green', label='Additive')
-    
-    # Add curved decision boundaries (simplified visualization)
-    theta = np.linspace(0, 2*np.pi, 100)
-    
-    # Boundary 1 (circle)
-    r = 2.5
-    plt.plot(r*np.cos(theta), r*np.sin(theta), 'k--', alpha=0.5)
-    
-    # Boundary 2 (curved)
-    x = np.linspace(-4, 4, 100)
-    plt.plot(x, -0.2*x**2 + 1, 'k--', alpha=0.5)
-    
-    plt.title("Simplified Visualization of Kreĭn-SVM Decision Boundaries")
-    plt.xlabel("Feature 1 (e.g., Drug A concentration)")
-    plt.ylabel("Feature 2 (e.g., Drug B concentration)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.axis('equal')
-    
-    st.pyplot(plt.gcf())
-    
-    st.markdown("""
-    *Note: This is a simplified visualization. Actual decision boundaries in Kreĭn-space SVMs can be 
-    much more complex, capturing intricate patterns of drug interactions that standard SVMs cannot represent.*
-    """)
-
-# Antibiotic Synergy Context page
-elif page == "Antibiotic Synergy Context":
-    st.header("Biological Context: Antibiotic Synergy")
-    
-    st.markdown("""
-    ### The Challenge of Antibiotic Resistance
-    
-    Antibiotic resistance is one of the most pressing global health challenges of our time. According to the WHO, 
-    antibiotic-resistant infections could cause 10 million deaths annually by 2050 if no action is taken.
-    
-    #### Key Challenges
-    
-    1. **Pipeline Gap**: Few new antibiotics are being developed
-    2. **Evolutionary Pressure**: Single antibiotics drive rapid resistance development
-    3. **Complex Mechanisms**: Resistance involves multiple cellular pathways
-    
-    ### Antibiotic Combinations as a Solution
-    
-    Combining multiple antibiotics can:
-    
-    1. **Enhance Efficacy**: Creating effects greater than the sum of individual drugs
-    2. **Reduce Resistance**: Making it harder for bacteria to develop concurrent mechanisms
-    3. **Lower Dosages**: Reducing side effects while maintaining effectiveness
-    
-    However, not all combinations are beneficial. Some combinations can be:
-    
-    - **Synergistic**: Enhanced effect (greater than additive)
-    - **Additive**: Combined effect equals the sum of individual effects
-    - **Antagonistic**: Combined effect is less than the sum, or even inhibitory
-    """)
-    
-    # Create visualization of different types of interactions
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Create heatmap for synergistic interactions
-        conc_range = np.linspace(0, 1, 10)
-        X, Y = np.meshgrid(conc_range, conc_range)
-        
-        # Synergistic effect (more than additive)
-        Z_synergy = 0.8 * X + 0.7 * Y + 1.5 * X * Y
-        
-        fig = go.Figure(data=[go.Heatmap(
-            z=Z_synergy,
-            x=conc_range,
-            y=conc_range,
-            colorscale='Viridis',
-            colorbar=dict(title="Effect")
-        )])
-        
-        fig.update_layout(
-            title="Synergistic Interaction",
-            xaxis_title="Drug A Concentration",
-            yaxis_title="Drug B Concentration",
-            width=400,
-            height=400
+        pos_kernel_type = st.selectbox(
+            "Positive Component Type:",
+            ["rbf", "polynomial", "linear"],
+            index=0
         )
         
-        st.plotly_chart(fig)
+        if pos_kernel_type == "rbf":
+            pos_gamma = st.slider("Gamma (positive component):", min_value=0.01, max_value=5.0, value=0.5, step=0.1)
+            pos_params = {"gamma": pos_gamma}
+        
+        elif pos_kernel_type == "polynomial":
+            pos_degree = st.slider("Degree (positive component):", min_value=1, max_value=10, value=3, step=1)
+            pos_gamma = st.slider("Gamma (positive component):", min_value=0.01, max_value=5.0, value=1.0, step=0.1)
+            pos_params = {"degree": pos_degree, "gamma": pos_gamma, "coef0": 1.0}
+            
+        else:  # linear
+            pos_params = {}
     
     with col2:
-        # Create heatmap for antagonistic interactions
-        Z_antagonistic = 0.8 * X + 0.7 * Y - 0.5 * X * Y
+        neg_weight = st.slider("Negative Component Weight:", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
         
-        fig = go.Figure(data=[go.Heatmap(
-            z=Z_antagonistic,
-            x=conc_range,
-            y=conc_range,
-            colorscale='Viridis',
-            colorbar=dict(title="Effect")
-        )])
+        st.markdown("""
+        The negative component in this demo uses a simple distance-based measure:
         
-        fig.update_layout(
-            title="Antagonistic Interaction",
-            xaxis_title="Drug A Concentration",
-            yaxis_title="Drug B Concentration",
-            width=400,
-            height=400
+        $$\kappa_-(x, y) = -||x - y||^2$$
+        
+        This captures dissimilarity between points. The weight controls the balance between positive and negative components.
+        """)
+    
+    # Generate example data
+    n_demo = 50
+    np.random.seed(42)
+    X_demo = np.random.rand(n_demo, 2) * 2 - 1  # Random 2D points in [-1, 1] x [-1, 1]
+    
+    # Compute positive kernel matrix
+    K_pos = compute_kernel_matrix(X_demo, pos_kernel_type, **pos_params)
+    
+    # Compute negative kernel matrix (simplified for demonstration)
+    n_samples = X_demo.shape[0]
+    K_neg = np.zeros((n_samples, n_samples))
+    
+    for i in range(n_samples):
+        for j in range(n_samples):
+            K_neg[i, j] = -np.sum((X_demo[i] - X_demo[j]) ** 2)
+    
+    # Normalize K_neg to have similar scale to K_pos
+    K_neg = K_neg / np.abs(K_neg).max() if np.abs(K_neg).max() > 0 else K_neg
+    
+    # Compute Kreĭn kernel
+    K_krein = K_pos - neg_weight * K_neg
+    
+    # Plot
+    tab1, tab2, tab3, tab4 = st.tabs(["Kernel Matrices", "Data Transformation", "Eigenvalues", "Mathematical Intuition"])
+    
+    with tab1:
+        # Create figure with 1 row and 3 columns
+        fig = make_subplots(rows=1, cols=3, subplot_titles=["Positive Component", "Negative Component", "Kreĭn Kernel"])
+        
+        # Add heatmap for positive component
+        fig.add_trace(
+            go.Heatmap(
+                z=K_pos,
+                colorscale='Blues',
+                showscale=True,
+                colorbar=dict(title="Similarity", x=0.3, y=0.8, len=0.5)
+            ),
+            row=1, col=1
         )
         
-        st.plotly_chart(fig)
+        # Add heatmap for negative component
+        fig.add_trace(
+            go.Heatmap(
+                z=K_neg * neg_weight,
+                colorscale='Reds',
+                showscale=True,
+                colorbar=dict(title="Dissimilarity", x=0.65, y=0.8, len=0.5)
+            ),
+            row=1, col=2
+        )
+        
+        # Add heatmap for Kreĭn kernel
+        fig.add_trace(
+            go.Heatmap(
+                z=K_krein,
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title="Kreĭn Value", x=1.0, y=0.8, len=0.5)
+            ),
+            row=1, col=3
+        )
+        
+        # Update layout
+        fig.update_layout(
+            title_text="Kreĭn Kernel Decomposition",
+            height=400,
+            width=900
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        # Transform data with the different kernels for visualization
+        # Use t-SNE for visualization
+        
+        # Create artificial classes for visualization (just for coloring)
+        y_demo = (X_demo[:, 0] > 0).astype(int) + (X_demo[:, 1] > 0).astype(int)
+        
+        # Transform with each kernel type
+        X_pos_transformed = apply_kernel_transformation(X_demo, pos_kernel_type, **pos_params)
+        
+        # For negative component, use a custom transformation
+        K_neg_norm = K_neg / np.abs(K_neg).max() if np.abs(K_neg).max() > 0 else K_neg
+        D_neg = 1 - K_neg_norm
+        from sklearn.manifold import TSNE
+        tsne = TSNE(n_components=2, metric='precomputed', perplexity=min(30, X_demo.shape[0]-1))
+        X_neg_transformed = tsne.fit_transform(D_neg)
+        
+        # Transform with Kreĭn kernel
+        X_krein_transformed = apply_kernel_transformation(X_demo, "kreĭn", pos_gamma=pos_params.get("gamma", 1.0), neg_weight=neg_weight)
+        
+        # Create figure
+        fig = make_subplots(rows=2, cols=2, 
+                           subplot_titles=["Original Data", "Positive Component", "Negative Component", "Kreĭn Kernel"])
+        
+        # Add scatter for original data
+        fig.add_trace(
+            go.Scatter(
+                x=X_demo[:, 0],
+                y=X_demo[:, 1],
+                mode='markers',
+                marker=dict(size=10, color=y_demo, colorscale='Viridis', showscale=False),
+                showlegend=False
+            ),
+            row=1, col=1
+        )
+        
+        # Add scatter for positive component
+        fig.add_trace(
+            go.Scatter(
+                x=X_pos_transformed[:, 0],
+                y=X_pos_transformed[:, 1],
+                mode='markers',
+                marker=dict(size=10, color=y_demo, colorscale='Viridis', showscale=False),
+                showlegend=False
+            ),
+            row=1, col=2
+        )
+        
+        # Add scatter for negative component
+        fig.add_trace(
+            go.Scatter(
+                x=X_neg_transformed[:, 0],
+                y=X_neg_transformed[:, 1],
+                mode='markers',
+                marker=dict(size=10, color=y_demo, colorscale='Viridis', showscale=False),
+                showlegend=False
+            ),
+            row=2, col=1
+        )
+        
+        # Add scatter for Kreĭn kernel
+        fig.add_trace(
+            go.Scatter(
+                x=X_krein_transformed[:, 0],
+                y=X_krein_transformed[:, 1],
+                mode='markers',
+                marker=dict(size=10, color=y_demo, colorscale='Viridis', showscale=True, 
+                           colorbar=dict(title="Class", x=1.0)),
+                showlegend=False
+            ),
+            row=2, col=2
+        )
+        
+        # Update layout
+        fig.update_layout(
+            height=700,
+            width=900,
+            title_text="Data Transformation with Different Kernels"
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("""
+        **Note:** The visualizations above show how the same data is transformed differently by each kernel component. 
+        The Kreĭn kernel combines the characteristics of both positive and negative components, potentially revealing 
+        structures that neither component could capture alone.
+        """)
+    
+    with tab3:
+        # Plot eigenvalues of each kernel matrix
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("#### Positive Component")
+            fig = plot_eigenspectrum(K_pos, pos_kernel_type.capitalize(), "Eigenspectrum of Positive Component")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            st.markdown("#### Negative Component")
+            fig = plot_eigenspectrum(K_neg * neg_weight, "Negative", "Eigenspectrum of Negative Component")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col3:
+            st.markdown("#### Kreĭn Kernel")
+            fig = plot_eigenspectrum(K_krein, "Kreĭn", "Eigenspectrum of Kreĭn Kernel")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("""
+        **Observations:**
+        
+        1. The positive component has only positive eigenvalues, as expected for a positive definite kernel.
+        2. The negative component has only negative eigenvalues (when weighted).
+        3. The Kreĭn kernel has a mixture of positive and negative eigenvalues, reflecting its indefinite nature.
+        
+        This indefiniteness is what gives Kreĭn kernels their power to model complex relationships that cannot be 
+        captured by positive definite kernels alone.
+        """)
+    
+    with tab4:
+        st.markdown("""
+        ### Mathematical Intuition Behind Kreĭn Kernels
+        
+        To develop intuition for Kreĭn kernels, consider these key concepts:
+        
+        #### 1. Positive Definite Kernels
+        
+        A positive definite kernel $\kappa_+$ measures *similarity* between points. Higher values indicate 
+        greater similarity. These kernels embed data into a space where similar points are close together.
+        
+        #### 2. Negative Definite Kernels
+        
+        A negative definite kernel $\kappa_-$ measures *dissimilarity* between points. Higher values indicate 
+        greater dissimilarity. These kernels embed data into a space where dissimilar points are pushed apart.
+        
+        #### 3. Kreĭn Kernels
+        
+        A Kreĭn kernel $\kappa = \kappa_+ - \kappa_-$ combines both similarity and dissimilarity measures.
+        This allows it to model:
+        
+        - Points that should be close together (through $\kappa_+$)
+        - Points that should be far apart (through $\kappa_-$)
+        - Complex relationships where some features indicate similarity while others indicate dissimilarity
+        
+        #### 4. Biological Relevance
+        
+        In biological systems, we often encounter:
+        
+        - Cooperative interactions (synergy) → modeled by $\kappa_+$
+        - Competitive interactions (antagonism) → modeled by $\kappa_-$
+        - Complex interactions involving both → modeled by the full Kreĭn kernel $\kappa$
+        
+        For example, in antibiotic synergy, two drugs might:
+        - Target similar pathways (similarity)
+        - Have opposing mechanisms in other pathways (dissimilarity)
+        - Result in either synergy or antagonism depending on which effect dominates
+        
+        Kreĭn kernels provide a natural mathematical framework to model these complex biological phenomena.
+        """)
+        
+        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Mark_Krein.jpg/250px-Mark_Krein.jpg", 
+                 caption="Mark Krein (1907-1989), mathematician who contributed significantly to the theory of indefinite inner product spaces")
+        
+        st.markdown("""
+        **Further Reading:**
+        
+        - Ong, C.S., Mary, X., Canu, S., Smola, A.J.: Learning with non-positive kernels. In: Proceedings of the Twenty-First International Conference on Machine Learning (2004)
+        
+        - Haasdonk, B.: Feature space interpretation of SVMs with indefinite kernels. IEEE Transactions on Pattern Analysis and Machine Intelligence (2005)
+        
+        - Gärtner, T., Lloyd, J.W., Flach, P.A.: Kernels and distances for structured data. Machine Learning (2004)
+        """)
+
+# Page: Biological Context
+elif page == "Biological Context":
+    st.title("Biological Context: Antibiotic Synergy")
     
     st.markdown("""
-    ### Biological Mechanisms of Synergy
+    ### What is Antibiotic Synergy?
     
-    Understanding why certain antibiotics work synergistically requires examining:
+    Antibiotic synergy occurs when the combined effect of two antibiotics is greater than the sum of their individual effects. 
+    This phenomenon is crucial for designing effective treatments for bacterial infections, especially in cases of antimicrobial resistance.
     
-    #### 1. Cellular Pathway Interactions
+    #### Key Concepts:
     
-    - **Sequential Inhibition**: One drug enhances the uptake or targeting of another
-    - **Parallel Pathway Inhibition**: Simultaneous disruption of multiple cellular functions
-    - **Stress Response Modulation**: One drug prevents adaptive responses to another
+    - **Fractional Inhibitory Concentration Index (FICI)**: A measure of drug interaction
+      - FICI < 0.5: Synergy
+      - 0.5 ≤ FICI ≤ 4: Additivity/Indifference
+      - FICI > 4: Antagonism
     
-    #### 2. Metabolic Network Effects
+    - **Mechanisms of Synergy**:
+      - Inhibition of different steps in the same biochemical pathway
+      - Enhanced penetration of one drug due to the action of another
+      - Inhibition of resistance mechanisms by one drug enabling another drug's action
+      - Interaction with different targets that results in enhanced bacterial killing
     
-    - **Flux Redirection**: Blocking one pathway forces metabolism through another vulnerable route
-    - **Energy Depletion**: Combined assault on energy-producing systems
-    - **Resource Competition**: Forcing cellular machinery to respond to multiple threats simultaneously
-    
-    #### 3. Resistance Mechanism Interactions
-    
-    - **Efflux Pump Saturation**: Overwhelming bacterial expulsion mechanisms
-    - **Cell Wall Destabilization**: One drug creates entry points for another
-    - **Compensatory Mutation Prevention**: Blocking genetic adaptation pathways
+    - **Significance in Clinical Settings**:
+      - Combating antibiotic resistance
+      - Reducing individual drug dosages
+      - Minimizing side effects
+      - Expanding the spectrum of activity
     """)
     
-    # Create network diagram
-    st.subheader("Antibiotic Interaction Networks")
+    # Interactive visualization
+    st.markdown("### Interactive Visualization of Drug Interactions")
     
-    # Create network figure
-    plt.figure(figsize=(10, 6))
-    
-    # Define nodes (cellular components/processes)
-    nodes = {
-        'CellWall': (0.2, 0.8),
-        'DNASynthesis': (0.8, 0.8),
-        'Ribosome': (0.5, 0.5),
-        'Metabolism': (0.2, 0.2),
-        'MembraneTransport': (0.8, 0.2)
-    }
-    
-    # Define edges (interactions)
-    edges = [
-        ('CellWall', 'MembraneTransport'),
-        ('CellWall', 'Metabolism'),
-        ('DNASynthesis', 'Metabolism'),
-        ('DNASynthesis', 'Ribosome'),
-        ('Ribosome', 'Metabolism'),
-        ('Ribosome', 'MembraneTransport')
-    ]
-    
-    # Plot nodes
-    for name, (x, y) in nodes.items():
-        plt.plot(x, y, 'o', markersize=15, color='cornflowerblue')
-        plt.text(x, y+0.05, name, ha='center', fontsize=10)
-    
-    # Plot edges
-    for node1, node2 in edges:
-        x1, y1 = nodes[node1]
-        x2, y2 = nodes[node2]
-        plt.plot([x1, x2], [y1, y2], '-', color='gray', alpha=0.6)
-    
-    # Add drug inhibition arrows
-    drug_a = (0.1, 0.9)
-    drug_b = (0.9, 0.9)
-    
-    plt.plot(drug_a[0], drug_a[1], 's', markersize=10, color='crimson')
-    plt.text(drug_a[0], drug_a[1]+0.05, "Drug A", ha='center', fontsize=10)
-    
-    plt.plot(drug_b[0], drug_b[1], 's', markersize=10, color='purple')
-    plt.text(drug_b[0], drug_b[1]+0.05, "Drug B", ha='center', fontsize=10)
-    
-    # Inhibition arrows
-    plt.arrow(drug_a[0]+0.02, drug_a[1]-0.02, 0.1, -0.05, head_width=0.02, head_length=0.02, fc='crimson', ec='crimson')
-    plt.arrow(drug_b[0]-0.02, drug_b[1]-0.02, -0.05, -0.05, head_width=0.02, head_length=0.02, fc='purple', ec='purple')
-    
-    plt.title("Network Model of Antibiotic Interactions")
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.axis('off')
-    
-    st.pyplot(plt.gcf())
-    
+    # Drug interaction model
     st.markdown("""
-    ### Why Kernel Methods for Antibiotic Synergy Research?
-    
-    Kernel methods are particularly well-suited for antibiotic synergy research because:
-    
-    1. **Capturing Complex Interactions**: Kernels can represent non-linear relationships between drugs and their targets
-    
-    2. **Interpretability**: Unlike black-box neural networks, kernel methods provide insights into which examples (drug pairs) 
-       influence predictions, aiding mechanistic understanding
-    
-    3. **Prior Knowledge Integration**: Graph kernels can incorporate known biological network information
-    
-    4. **Handling Heterogeneous Data**: Kernels can combine multiple data types (chemical structures, genomics, proteomics)
-    
-    5. **Modeling Opposing Forces**: Kreĭn-space kernels uniquely capture the push-pull dynamics in bacterial networks 
-       responding to multiple stressors
+    Below is a simplified model of drug interactions based on their mechanisms of action. 
+    You can adjust the parameters to see how different factors influence synergy.
     """)
     
-    st.subheader("Current State of the Art")
-    
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("""
-        #### Traditional Methods
-        
-        - **Checkerboard Assays**:
-          - Manual experimental testing of drug combinations
-          - Time-consuming and expensive
-          - Limited to pairwise interactions
-        
-        - **Fractional Inhibitory Concentration Index (FICI)**:
-          - Simple mathematical model
-          - Doesn't capture complex interactions
-          - Binary classification only (synergistic/not)
-        """)
+        drug_a_conc = st.slider("Drug A concentration:", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+        cell_wall_inhib = st.slider("Cell wall inhibition effect:", min_value=0.0, max_value=1.0, value=0.7, step=0.05)
     
     with col2:
-        st.markdown("""
-        #### Advanced Computational Approaches
-        
-        - **DeepSynergy**:
-          - Neural network model for drug combination effects
-          - High accuracy but low interpretability
-          - Requires large datasets
-        
-        - **Mechanistic Models**:
-          - Detailed cellular simulations
-          - Extremely complex
-          - Requires extensive parameter tuning
-        """)
+        drug_b_conc = st.slider("Drug B concentration:", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+        protein_synth_inhib = st.slider("Protein synthesis inhibition:", min_value=0.0, max_value=1.0, value=0.6, step=0.05)
     
-    st.markdown("""
-    ### The Promise of Kreĭn-Space Kernel Methods
+    with col3:
+        penetration_factor = st.slider("Permeability enhancement:", min_value=0.0, max_value=1.0, value=0.4, step=0.05)
+        resistance_suppression = st.slider("Resistance mechanism suppression:", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
     
-    Kreĭn-space kernel methods represent a middle ground:
+    # Calculate synergy score
+    # Simple model: synergy scores based on provided factors
+    independent_effect = drug_a_conc * cell_wall_inhib + drug_b_conc * protein_synth_inhib
+    synergy_contribution = (drug_a_conc * drug_b_conc * penetration_factor) + (resistance_suppression * max(drug_a_conc, drug_b_conc))
     
-    - More sophisticated than simple indices like FICI
-    - More interpretable than black-box neural networks
-    - Better at modeling the dual nature (synergy/antagonism) of drug interactions
-    - Capable of representing both local and global network effects
+    # Rescale to 0-1
+    max_possible = 2 + 1  # max of independent effect + max of synergy contribution
+    combined_effect = (independent_effect + synergy_contribution) / max_possible
     
-    By modeling both synergistic (positive) and antagonistic (negative) components simultaneously,
-    Kreĭn-space kernels match the biological reality of competing forces in cellular networks
-    responding to multiple stressors.
-    """)
-
-# Experimental Data Visualization page
-elif page == "Experimental Data Visualization":
-    st.header("Experimental Data Visualization")
+    # Calculate FICI (simplified model)
+    # Lower FICI indicates stronger synergy
+    fici = 1.0 - synergy_contribution  # Simplified: higher synergy contribution gives lower FICI
     
-    st.markdown("""
-    ### Analyzing Real Experimental Data
+    # Classify the interaction
+    if fici < 0.5:
+        interaction_type = "Synergistic"
+        interaction_color = "green"
+    elif fici <= 4:
+        interaction_type = "Additive/Indifferent"
+        interaction_color = "blue"
+    else:
+        interaction_type = "Antagonistic"
+        interaction_color = "red"
     
-    This section allows you to visualize and analyze experimental antibiotic synergy data. 
-    While we cannot provide real proprietary research data, we have created a representative dataset 
-    based on published literature trends to demonstrate how kernel methods can be applied to 
-    experimental results.
-    """)
+    # Display results
+    col1, col2, col3 = st.columns(3)
     
-    # Create sample experimental data
-    np.random.seed(42)
+    with col1:
+        st.metric("Combined Effect", f"{combined_effect:.2f}")
     
-    # Create drug pairs
-    antibiotics = ["Ampicillin", "Tetracycline", "Ciprofloxacin", "Gentamicin", "Trimethoprim",
-                  "Erythromycin", "Rifampicin", "Vancomycin", "Ceftriaxone", "Azithromycin"]
+    with col2:
+        st.metric("FICI", f"{fici:.2f}")
     
-    n_drugs = len(antibiotics)
-    n_pairs = n_drugs * (n_drugs - 1) // 2
+    with col3:
+        st.markdown(f"<h3 style='color:{interaction_color};'>Interaction: {interaction_type}</h3>", unsafe_allow_html=True)
     
-    # Create empty dataframe
-    pairs = []
-    for i in range(n_drugs):
-        for j in range(i+1, n_drugs):
-            pairs.append((antibiotics[i], antibiotics[j]))
+    # Visualization of drug interaction
+    st.markdown("### Visualization of Drug Combination Effects")
     
-    # Generate features that might be available from experiments
-    # These would normally come from real data
+    # Create a grid of drug concentrations
+    x = np.linspace(0, 1, 20)
+    y = np.linspace(0, 1, 20)
+    X, Y = np.meshgrid(x, y)
     
-    # Drug A properties (MIC values, etc)
-    drug_A_properties = np.random.rand(n_pairs, 3)
+    # Calculate combined effect for each combination
+    Z = np.zeros_like(X)
+    FICI = np.zeros_like(X)
     
-    # Drug B properties
-    drug_B_properties = np.random.rand(n_pairs, 3)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            drug_a = X[i, j]
+            drug_b = Y[i, j]
+            indep_effect = drug_a * cell_wall_inhib + drug_b * protein_synth_inhib
+            syn_contrib = (drug_a * drug_b * penetration_factor) + (resistance_suppression * max(drug_a, drug_b))
+            Z[i, j] = (indep_effect + syn_contrib) / max_possible
+            FICI[i, j] = 1.0 - syn_contrib
     
-    # Combined effect measures
-    combined_effects = np.random.rand(n_pairs, 4)
+    # Create classification matrix
+    classes = np.zeros_like(FICI, dtype=int)
+    classes[FICI < 0.5] = 2  # Synergistic
+    classes[(FICI >= 0.5) & (FICI <= 4)] = 1  # Additive
+    classes[FICI > 4] = 0  # Antagonistic
     
-    # FICI values (< 0.5: synergistic, 0.5-4: additive, > 4: antagonistic)
-    fici_values = np.random.lognormal(mean=-0.5, sigma=0.7, size=n_pairs)
+    # Create tabs for different visualizations
+    tab1, tab2, tab3 = st.tabs(["Combined Effect", "FICI", "Interaction Class"])
     
-    # Synergy scores
-    synergy_scores = 1.0 - fici_values / 5  # Transform to roughly 0-1 scale
-    synergy_scores = np.clip(synergy_scores, 0, 1)
-    
-    # Create categorical labels
-    synergy_labels = ["Antagonistic" if f > 4 else "Additive" if f >= 0.5 else "Synergistic" for f in fici_values]
-    
-    # Create dataframe
-    data = {
-        "Drug_A": [pair[0] for pair in pairs],
-        "Drug_B": [pair[1] for pair in pairs],
-        "FICI": fici_values,
-        "Synergy_Score": synergy_scores,
-        "Classification": synergy_labels,
-        "MIC_Reduction_A": drug_A_properties[:, 0] * 10,
-        "MIC_Reduction_B": drug_B_properties[:, 0] * 10,
-        "Growth_Inhibition": combined_effects[:, 0] * 100  # Percentage
-    }
-    
-    exp_df = pd.DataFrame(data)
-    
-    # Display the data
-    st.subheader("Sample Experimental Data")
-    st.dataframe(exp_df)
-    
-    # Visualization options
-    st.subheader("Data Visualization")
-    
-    viz_type = st.radio(
-        "Select visualization type",
-        ["Synergy Heatmap", "Drug Pair Comparison", "Kernel Analysis"]
-    )
-    
-    if viz_type == "Synergy Heatmap":
-        st.markdown("### Synergy Heatmap")
-        st.markdown("This heatmap shows the interaction strengths between different antibiotic pairs.")
-        
-        # Create a matrix for heatmap
-        synergy_matrix = np.zeros((n_drugs, n_drugs))
-        
-        # Fill the matrix with FICI values
-        pair_idx = 0
-        for i in range(n_drugs):
-            for j in range(i+1, n_drugs):
-                synergy_value = 1.0 - exp_df.iloc[pair_idx]["FICI"] / 5  # Transform for visualization
-                synergy_value = np.clip(synergy_value, 0, 1)
-                
-                synergy_matrix[i, j] = synergy_value
-                synergy_matrix[j, i] = synergy_value  # Make it symmetric
-                pair_idx += 1
-        
-        # Create heatmap
-        fig = go.Figure(data=go.Heatmap(
-            z=synergy_matrix,
-            x=antibiotics,
-            y=antibiotics,
-            colorscale='RdBu_r',
-            colorbar=dict(title="Synergy Score")
-        ))
+    with tab1:
+        fig = go.Figure(data=[
+            go.Surface(z=Z, x=X, y=Y, colorscale='Viridis',
+                      colorbar=dict(title="Combined Effect"))
+        ])
         
         fig.update_layout(
-            title="Antibiotic Synergy Heatmap",
-            xaxis_title="Antibiotic",
-            yaxis_title="Antibiotic",
+            title="Combined Effect of Drug A and Drug B",
+            scene=dict(
+                xaxis_title="Drug A Concentration",
+                yaxis_title="Drug B Concentration",
+                zaxis_title="Combined Effect",
+                xaxis=dict(range=[0, 1]),
+                yaxis=dict(range=[0, 1]),
+                zaxis=dict(range=[0, 1])
+            ),
             width=700,
             height=700
         )
         
-        st.plotly_chart(fig)
-        
-        st.markdown("""
-        **Interpretation**: 
-        - Darker blue colors indicate stronger synergistic effects
-        - Darker red colors indicate antagonistic effects
-        - White/neutral colors indicate additive effects
-        
-        This visualization helps identify promising drug combinations for further investigation.
-        """)
-    
-    elif viz_type == "Drug Pair Comparison":
-        st.markdown("### Drug Pair Comparison")
-        
-        # Allow selection of drug pairs
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            drug_a = st.selectbox("Select first drug", antibiotics)
-        
-        with col2:
-            drug_b_options = [drug for drug in antibiotics if drug != drug_a]
-            drug_b = st.selectbox("Select second drug", drug_b_options)
-        
-        # Find the pair in the dataframe
-        pair_data = exp_df[(exp_df["Drug_A"] == drug_a) & (exp_df["Drug_B"] == drug_b)]
-        
-        if pair_data.empty:
-            pair_data = exp_df[(exp_df["Drug_A"] == drug_b) & (exp_df["Drug_B"] == drug_a)]
-        
-        if not pair_data.empty:
-            # Display pair information
-            st.subheader(f"{drug_a} + {drug_b} Interaction")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("FICI Value", f"{pair_data['FICI'].values[0]:.2f}")
-            
-            with col2:
-                st.metric("Synergy Score", f"{pair_data['Synergy_Score'].values[0]:.2f}")
-            
-            with col3:
-                st.metric("Classification", pair_data["Classification"].values[0])
-            
-            # Create a detailed visualization
-            # Simulate a dose-response surface
-            conc_range = np.linspace(0, 1, 20)
-            X, Y = np.meshgrid(conc_range, conc_range)
-            
-            # Create a response surface based on the synergy type
-            if pair_data["Classification"].values[0] == "Synergistic":
-                Z = 0.8 * X + 0.7 * Y + 1.5 * X * Y
-            elif pair_data["Classification"].values[0] == "Antagonistic":
-                Z = 0.8 * X + 0.7 * Y - 0.5 * X * Y
-            else:  # Additive
-                Z = 0.8 * X + 0.7 * Y + 0.1 * X * Y
-            
-            # Add some noise
-            np.random.seed(42)
-            Z += np.random.normal(0, 0.05, Z.shape)
-            
-            # Create the surface plot
-            fig = go.Figure(data=[go.Surface(z=Z, x=conc_range, y=conc_range)])
-            fig.update_layout(
-                title=f"{drug_a} + {drug_b} Dose-Response Surface",
-                scene=dict(
-                    xaxis_title=f"{drug_a} Concentration",
-                    yaxis_title=f"{drug_b} Concentration",
-                    zaxis_title="Inhibition Effect"
+        # Add a point for the current selection
+        fig.add_trace(
+            go.Scatter3d(
+                x=[drug_a_conc],
+                y=[drug_b_conc],
+                z=[combined_effect],
+                mode='markers',
+                marker=dict(
+                    size=10,
+                    color='red',
                 ),
-                width=700,
-                height=700
+                name="Current Selection"
             )
-            
-            st.plotly_chart(fig)
-            
-            st.markdown("""
-            **Interpreting the Response Surface**:
-            
-            This 3D surface shows how the combined effect of the drug pair varies with different concentrations.
-            
-            - For **synergistic** pairs, the surface curves upward (combined effect > sum of individual effects)
-            - For **antagonistic** pairs, the surface curves downward (combined effect < sum of individual effects)
-            - For **additive** pairs, the surface is nearly linear (combined effect ≈ sum of individual effects)
-            
-            The shape of this surface provides insights into the optimal dosing ratios for maximal efficacy.
-            """)
+        )
         
-    elif viz_type == "Kernel Analysis":
-        st.markdown("### Kernel Analysis of Drug Interactions")
-        
-        # Create a feature matrix from the data
-        features = np.column_stack([
-            exp_df["MIC_Reduction_A"],
-            exp_df["MIC_Reduction_B"],
-            exp_df["Growth_Inhibition"]
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        fig = go.Figure(data=[
+            go.Surface(z=FICI, x=X, y=Y, colorscale='Viridis',
+                      colorbar=dict(title="FICI"))
         ])
         
-        # Normalize features
-        features = (features - features.mean(axis=0)) / features.std(axis=0)
-        
-        # Create labels based on classification
-        class_mapping = {"Synergistic": 2, "Additive": 1, "Antagonistic": 0}
-        labels = np.array([class_mapping[label] for label in exp_df["Classification"]])
-        
-        # Select kernel type
-        kernel_type = st.selectbox(
-            "Select kernel for analysis",
-            ["Linear", "RBF", "Polynomial", "Kreĭn-Space"]
-        )
-        
-        # Compute kernel matrix
-        if kernel_type == "Kreĭn-Space":
-            pos_gamma = st.slider("Positive Component Gamma", 0.01, 2.0, 0.5, 0.01)
-            neg_weight = st.slider("Negative Component Weight", 0.0, 1.0, 0.3, 0.05)
-            
-            kernel_matrix = compute_krein_kernel_matrix(features, pos_gamma=pos_gamma, neg_weight=neg_weight)
-            compared_kernel = compute_kernel_matrix(features, "RBF", gamma=pos_gamma)
-        else:
-            if kernel_type == "RBF":
-                gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01)
-                kernel_params = {"gamma": gamma}
-            elif kernel_type == "Polynomial":
-                degree = st.slider("Degree", 1, 5, 3)
-                coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1)
-                kernel_params = {"degree": degree, "coef0": coef0}
-            else:  # Linear
-                kernel_params = {}
-            
-            kernel_matrix = compute_kernel_matrix(features, kernel_type, **kernel_params)
-            
-            # Compare with Kreĭn kernel
-            compared_kernel = compute_krein_kernel_matrix(features, pos_gamma=0.5, neg_weight=0.3)
-        
-        # Plot the kernel matrices
-        fig = plot_kernel_matrix(
-            kernel_matrix, 
-            compared_kernel, 
-            kernel_type, 
-            "Kreĭn-Space" if kernel_type != "Kreĭn-Space" else "RBF", 
-            labels
-        )
-        
-        st.plotly_chart(fig)
-        
-        # Apply kernel transformation for visualization
-        if kernel_type == "Kreĭn-Space":
-            transformed_features = apply_kernel_transformation(
-                features, 
-                kernel_type, 
-                pos_gamma=pos_gamma, 
-                neg_weight=neg_weight
-            )
-        else:
-            transformed_features = apply_kernel_transformation(features, kernel_type, **kernel_params)
-        
-        # Create a scatter plot of the transformed data
-        fig = px.scatter(
-            x=transformed_features[:, 0],
-            y=transformed_features[:, 1],
-            color=exp_df["Classification"],
-            hover_name=[f"{a} + {b}" for a, b in zip(exp_df["Drug_A"], exp_df["Drug_B"])],
-            color_discrete_map={
-                "Synergistic": "green",
-                "Additive": "blue",
-                "Antagonistic": "red"
-            },
-            labels={
-                "x": "Transformed Dimension 1",
-                "y": "Transformed Dimension 2",
-                "color": "Interaction Type"
-            },
-            title=f"Drug Combinations after {kernel_type} Kernel Transformation"
-        )
-        
-        st.plotly_chart(fig)
-        
-        st.markdown(f"""
-        **Interpreting the Kernel Analysis**:
-        
-        The kernel matrix visualization shows pairwise similarities between drug combinations according to the selected kernel.
-        
-        The scatter plot shows how the {kernel_type} kernel transforms the data. Points that cluster together are considered similar by the kernel.
-        
-        Note how the Kreĭn-space kernel often provides better separation between different interaction types 
-        (synergistic, additive, antagonistic) because it can model both positive and negative similarities.
-        
-        This analysis helps identify patterns in drug combination effects that might not be apparent from 
-        raw experimental data, potentially revealing underlying mechanisms of action.
-        """)
-
-# Interactive Visualizations page
-elif page == "Interactive Visualizations":
-    st.header("Interactive Kernel Visualizations")
-    
-    st.markdown("""
-    This interactive visualization demonstrates how different kernels transform data. 
-    Select parameters below to see how kernels map data from the original space to feature space.
-    """)
-    
-    # Create columns for controls and visualization
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("Controls")
-        
-        # Data generation options
-        data_type = st.selectbox(
-            "Select data type",
-            ["Two Clusters", "Circles", "Moons", "Linearly Separable", "Drug Response"]
-        )
-        
-        n_samples = st.slider("Number of samples", 10, 200, 100)
-        noise = st.slider("Noise level", 0.0, 0.5, 0.1, 0.05)
-        
-        # Kernel selection
-        kernel_type = st.selectbox(
-            "Select kernel type",
-            ["Linear", "RBF", "Polynomial", "Sigmoid", "Kreĭn-Space"]
-        )
-        
-        # Kernel parameters
-        if kernel_type == "RBF":
-            gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01)
-        elif kernel_type == "Polynomial":
-            degree = st.slider("Degree", 1, 5, 3)
-            coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1)
-        elif kernel_type == "Sigmoid":
-            gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01)
-            coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1)
-        elif kernel_type == "Kreĭn-Space":
-            pos_gamma = st.slider("Positive Component Gamma", 0.01, 2.0, 0.5, 0.01)
-            neg_weight = st.slider("Negative Component Weight", 0.0, 1.0, 0.3, 0.05)
-    
-    # Generate data based on selection
-    if data_type == "Drug Response":
-        X, y = generate_drug_response_data(n_samples, noise)
-        data_dim = 2  # We'll just show the first 2 dimensions visually
-    else:
-        X, y = generate_sample_data(data_type, n_samples, noise)
-        data_dim = X.shape[1]
-    
-    # Apply kernel transformation
-    if kernel_type == "Linear":
-        kernel_params = {}
-        transformed_X = apply_kernel_transformation(X, kernel_type, **kernel_params)
-    elif kernel_type == "RBF":
-        kernel_params = {"gamma": gamma}
-        transformed_X = apply_kernel_transformation(X, kernel_type, **kernel_params)
-    elif kernel_type == "Polynomial":
-        kernel_params = {"degree": degree, "coef0": coef0}
-        transformed_X = apply_kernel_transformation(X, kernel_type, **kernel_params)
-    elif kernel_type == "Sigmoid":
-        kernel_params = {"gamma": gamma, "coef0": coef0}
-        transformed_X = apply_kernel_transformation(X, kernel_type, **kernel_params)
-    elif kernel_type == "Kreĭn-Space":
-        kernel_params = {"pos_gamma": pos_gamma, "neg_weight": neg_weight}
-        transformed_X = apply_kernel_transformation(X, kernel_type, **kernel_params)
-    
-    with col2:
-        # Visualize original and transformed data
-        fig = plot_transformed_data(X, transformed_X, y, kernel_type, data_type)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("""
-    ### Interpretation
-    
-    The visualization above shows:
-    - **Left**: Original data in its input space
-    - **Right**: Data after kernel transformation (projected to 2D for visualization)
-    
-    Note how different kernels transform the data in unique ways. In antibiotic research, 
-    these transformations can reveal hidden patterns in how drugs interact with biological systems.
-    """)
-
-# Kernel Matrices page
-elif page == "Kernel Matrices":
-    st.header("Kernel Matrices")
-    
-    st.markdown("""
-    A kernel matrix represents pairwise similarities between all data points in your dataset.
-    For a dataset with n samples, the kernel matrix K is an n×n matrix where K[i,j] is the 
-    similarity between samples i and j according to the chosen kernel function.
-    
-    In antibiotic synergy research, kernel matrices can reveal patterns in how different drug 
-    combinations affect biological pathways.
-    """)
-    
-    # Create columns for controls and visualization
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("Controls")
-        
-        # Data generation options
-        data_type = st.selectbox(
-            "Select data type",
-            ["Two Clusters", "Circles", "Moons", "Linearly Separable", "Drug Response"],
-            key="matrix_data_type"
-        )
-        
-        n_samples = st.slider("Number of samples", 10, 50, 20, key="matrix_n_samples")
-        noise = st.slider("Noise level", 0.0, 0.5, 0.1, 0.05, key="matrix_noise")
-        
-        # Kernel selection for comparison
-        kernel_type1 = st.selectbox(
-            "Kernel 1",
-            ["Linear", "RBF", "Polynomial", "Sigmoid"],
-            key="matrix_kernel1"
-        )
-        
-        kernel_type2 = st.selectbox(
-            "Kernel 2",
-            ["Linear", "RBF", "Polynomial", "Sigmoid", "Kreĭn-Space"],
-            index=4,
-            key="matrix_kernel2"
-        )
-        
-        # Kernel parameters
-        if kernel_type1 == "RBF" or kernel_type2 == "RBF":
-            gamma = st.slider("Gamma (for RBF)", 0.01, 2.0, 0.5, 0.01, key="matrix_gamma")
-        
-        if kernel_type1 == "Polynomial" or kernel_type2 == "Polynomial":
-            degree = st.slider("Degree (for Polynomial)", 1, 5, 3, key="matrix_degree")
-            poly_coef0 = st.slider("Coef0 (for Polynomial)", 0.0, 2.0, 1.0, 0.1, key="matrix_poly_coef0")
-        
-        if kernel_type1 == "Sigmoid" or kernel_type2 == "Sigmoid":
-            sigmoid_gamma = st.slider("Gamma (for Sigmoid)", 0.01, 2.0, 0.5, 0.01, key="matrix_sigmoid_gamma")
-            sigmoid_coef0 = st.slider("Coef0 (for Sigmoid)", 0.0, 2.0, 1.0, 0.1, key="matrix_sigmoid_coef0")
-        
-        if kernel_type1 == "Kreĭn-Space" or kernel_type2 == "Kreĭn-Space":
-            pos_gamma = st.slider("Positive Component Gamma (for Kreĭn)", 0.01, 2.0, 0.5, 0.01, key="matrix_krein_gamma")
-            neg_weight = st.slider("Negative Component Weight (for Kreĭn)", 0.0, 1.0, 0.3, 0.05, key="matrix_krein_weight")
-    
-    # Generate data based on selection
-    if data_type == "Drug Response":
-        X, y = generate_drug_response_data(n_samples, noise)
-    else:
-        X, y = generate_sample_data(data_type, n_samples, noise)
-    
-    # Compute kernel matrices
-    kernel1_params = {}
-    kernel2_params = {}
-    
-    if kernel_type1 == "RBF":
-        kernel1_params["gamma"] = gamma
-    elif kernel_type1 == "Polynomial":
-        kernel1_params["degree"] = degree
-        kernel1_params["coef0"] = poly_coef0
-    elif kernel_type1 == "Sigmoid":
-        kernel1_params["gamma"] = sigmoid_gamma
-        kernel1_params["coef0"] = sigmoid_coef0
-    
-    if kernel_type2 == "RBF":
-        kernel2_params["gamma"] = gamma
-    elif kernel_type2 == "Polynomial":
-        kernel2_params["degree"] = degree
-        kernel2_params["coef0"] = poly_coef0
-    elif kernel_type2 == "Sigmoid":
-        kernel2_params["gamma"] = sigmoid_gamma
-        kernel2_params["coef0"] = sigmoid_coef0
-    elif kernel_type2 == "Kreĭn-Space":
-        kernel2_params["pos_gamma"] = pos_gamma
-        kernel2_params["neg_weight"] = neg_weight
-    
-    K1 = compute_kernel_matrix(X, kernel_type1, **kernel1_params)
-    
-    if kernel_type2 == "Kreĭn-Space":
-        K2 = compute_krein_kernel_matrix(X, pos_gamma=pos_gamma, neg_weight=neg_weight)
-    else:
-        K2 = compute_kernel_matrix(X, kernel_type2, **kernel2_params)
-    
-    with col2:
-        # Plot kernel matrices side by side
-        fig = plot_kernel_matrix(K1, K2, kernel_type1, kernel_type2, y)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("""
-    ### Interpretation
-    
-    The above heatmaps represent kernel matrices for two different kernel functions:
-    
-    - **Left**: Standard kernel matrix showing similarities between samples
-    - **Right**: For comparison (could be a Kreĭn-space kernel)
-    
-    **How to interpret:**
-    - Bright spots indicate high similarity between samples
-    - Dark spots indicate low similarity
-    - In Kreĭn-space kernels, negative similarities (blue) can represent conflicting or antagonistic relationships
-    
-    This visualization helps identify patterns in how different data points relate to each other according to 
-    different similarity measures.
-    """)
-
-# Experimental Data Visualization page
-elif page == "Experimental Data Visualization":
-    st.header("Experimental Data Visualization")
-    
-    st.markdown("""
-    ### Analyzing Real Experimental Data
-    
-    This section allows you to visualize and analyze experimental antibiotic synergy data. 
-    While we cannot provide real proprietary research data, we have created a representative dataset 
-    based on published literature trends to demonstrate how kernel methods can be applied to 
-    experimental results.
-    """)
-    
-    # Create sample experimental data
-    np.random.seed(42)
-    
-    # Create drug pairs
-    antibiotics = ["Ampicillin", "Tetracycline", "Ciprofloxacin", "Gentamicin", "Trimethoprim",
-                  "Erythromycin", "Rifampicin", "Vancomycin", "Ceftriaxone", "Azithromycin"]
-    
-    n_drugs = len(antibiotics)
-    n_pairs = n_drugs * (n_drugs - 1) // 2
-    
-    # Create empty dataframe
-    pairs = []
-    for i in range(n_drugs):
-        for j in range(i+1, n_drugs):
-            pairs.append((antibiotics[i], antibiotics[j]))
-    
-    # Generate features that might be available from experiments
-    # These would normally come from real data
-    
-    # Drug A properties (MIC values, etc)
-    drug_A_properties = np.random.rand(n_pairs, 3)
-    
-    # Drug B properties
-    drug_B_properties = np.random.rand(n_pairs, 3)
-    
-    # Combined effect measures
-    combined_effects = np.random.rand(n_pairs, 4)
-    
-    # FICI values (< 0.5: synergistic, 0.5-4: additive, > 4: antagonistic)
-    fici_values = np.random.lognormal(mean=-0.5, sigma=0.7, size=n_pairs)
-    
-    # Synergy scores
-    synergy_scores = 1.0 - fici_values / 5  # Transform to roughly 0-1 scale
-    synergy_scores = np.clip(synergy_scores, 0, 1)
-    
-    # Create categorical labels
-    synergy_labels = ["Antagonistic" if f > 4 else "Additive" if f >= 0.5 else "Synergistic" for f in fici_values]
-    
-    # Create dataframe
-    data = {
-        "Drug_A": [pair[0] for pair in pairs],
-        "Drug_B": [pair[1] for pair in pairs],
-        "FICI": fici_values,
-        "Synergy_Score": synergy_scores,
-        "Classification": synergy_labels,
-        "MIC_Reduction_A": drug_A_properties[:, 0] * 10,
-        "MIC_Reduction_B": drug_B_properties[:, 0] * 10,
-        "Growth_Inhibition": combined_effects[:, 0] * 100  # Percentage
-    }
-    
-    exp_df = pd.DataFrame(data)
-    
-    # Display the data
-    st.subheader("Sample Experimental Data")
-    st.dataframe(exp_df)
-    
-    # Visualization options
-    st.subheader("Data Visualization")
-    
-    viz_type = st.radio(
-        "Select visualization type",
-        ["Synergy Heatmap", "Drug Pair Comparison", "Kernel Analysis"]
-    )
-    
-    if viz_type == "Synergy Heatmap":
-        st.markdown("### Synergy Heatmap")
-        st.markdown("This heatmap shows the interaction strengths between different antibiotic pairs.")
-        
-        # Create a matrix for heatmap
-        synergy_matrix = np.zeros((n_drugs, n_drugs))
-        
-        # Fill the matrix with FICI values
-        pair_idx = 0
-        for i in range(n_drugs):
-            for j in range(i+1, n_drugs):
-                synergy_value = 1.0 - exp_df.iloc[pair_idx]["FICI"] / 5  # Transform for visualization
-                synergy_value = np.clip(synergy_value, 0, 1)
-                
-                synergy_matrix[i, j] = synergy_value
-                synergy_matrix[j, i] = synergy_value  # Make it symmetric
-                pair_idx += 1
-        
-        # Create heatmap
-        fig = go.Figure(data=go.Heatmap(
-            z=synergy_matrix,
-            x=antibiotics,
-            y=antibiotics,
-            colorscale='RdBu_r',
-            colorbar=dict(title="Synergy Score")
-        ))
-        
         fig.update_layout(
-            title="Antibiotic Synergy Heatmap",
-            xaxis_title="Antibiotic",
-            yaxis_title="Antibiotic",
+            title="FICI Value for Drug A and Drug B Combinations",
+            scene=dict(
+                xaxis_title="Drug A Concentration",
+                yaxis_title="Drug B Concentration",
+                zaxis_title="FICI",
+                xaxis=dict(range=[0, 1]),
+                yaxis=dict(range=[0, 1])
+            ),
             width=700,
             height=700
         )
         
-        st.plotly_chart(fig)
-        
-        st.markdown("""
-        **Interpretation**: 
-        - Darker blue colors indicate stronger synergistic effects
-        - Darker red colors indicate antagonistic effects
-        - White/neutral colors indicate additive effects
-        
-        This visualization helps identify promising drug combinations for further investigation.
-        """)
-    
-    elif viz_type == "Drug Pair Comparison":
-        st.markdown("### Drug Pair Comparison")
-        
-        # Allow selection of drug pairs
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            drug_a = st.selectbox("Select first drug", antibiotics)
-        
-        with col2:
-            drug_b_options = [drug for drug in antibiotics if drug != drug_a]
-            drug_b = st.selectbox("Select second drug", drug_b_options)
-        
-        # Find the pair in the dataframe
-        pair_data = exp_df[(exp_df["Drug_A"] == drug_a) & (exp_df["Drug_B"] == drug_b)]
-        
-        if pair_data.empty:
-            pair_data = exp_df[(exp_df["Drug_A"] == drug_b) & (exp_df["Drug_B"] == drug_a)]
-        
-        if not pair_data.empty:
-            # Display pair information
-            st.subheader(f"{drug_a} + {drug_b} Interaction")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("FICI Value", f"{pair_data['FICI'].values[0]:.2f}")
-            
-            with col2:
-                st.metric("Synergy Score", f"{pair_data['Synergy_Score'].values[0]:.2f}")
-            
-            with col3:
-                st.metric("Classification", pair_data["Classification"].values[0])
-            
-            # Create a detailed visualization
-            # Simulate a dose-response surface
-            conc_range = np.linspace(0, 1, 20)
-            X, Y = np.meshgrid(conc_range, conc_range)
-            
-            # Create a response surface based on the synergy type
-            if pair_data["Classification"].values[0] == "Synergistic":
-                Z = 0.8 * X + 0.7 * Y + 1.5 * X * Y
-            elif pair_data["Classification"].values[0] == "Antagonistic":
-                Z = 0.8 * X + 0.7 * Y - 0.5 * X * Y
-            else:  # Additive
-                Z = 0.8 * X + 0.7 * Y + 0.1 * X * Y
-            
-            # Add some noise
-            np.random.seed(42)
-            Z += np.random.normal(0, 0.05, Z.shape)
-            
-            # Create the surface plot
-            fig = go.Figure(data=[go.Surface(z=Z, x=conc_range, y=conc_range)])
-            fig.update_layout(
-                title=f"{drug_a} + {drug_b} Dose-Response Surface",
-                scene=dict(
-                    xaxis_title=f"{drug_a} Concentration",
-                    yaxis_title=f"{drug_b} Concentration",
-                    zaxis_title="Inhibition Effect"
+        # Add a point for the current selection
+        fig.add_trace(
+            go.Scatter3d(
+                x=[drug_a_conc],
+                y=[drug_b_conc],
+                z=[fici],
+                mode='markers',
+                marker=dict(
+                    size=10,
+                    color='red',
                 ),
-                width=700,
-                height=700
+                name="Current Selection"
             )
-            
-            st.plotly_chart(fig)
-            
-            st.markdown("""
-            **Interpreting the Response Surface**:
-            
-            This 3D surface shows how the combined effect of the drug pair varies with different concentrations.
-            
-            - For **synergistic** pairs, the surface curves upward (combined effect > sum of individual effects)
-            - For **antagonistic** pairs, the surface curves downward (combined effect < sum of individual effects)
-            - For **additive** pairs, the surface is nearly linear (combined effect ≈ sum of individual effects)
-            
-            The shape of this surface provides insights into the optimal dosing ratios for maximal efficacy.
-            """)
-        
-    elif viz_type == "Kernel Analysis":
-        st.markdown("### Kernel Analysis of Drug Interactions")
-        
-        # Create a feature matrix from the data
-        features = np.column_stack([
-            exp_df["MIC_Reduction_A"],
-            exp_df["MIC_Reduction_B"],
-            exp_df["Growth_Inhibition"]
-        ])
-        
-        # Normalize features
-        features = (features - features.mean(axis=0)) / features.std(axis=0)
-        
-        # Create labels based on classification
-        class_mapping = {"Synergistic": 2, "Additive": 1, "Antagonistic": 0}
-        labels = np.array([class_mapping[label] for label in exp_df["Classification"]])
-        
-        # Select kernel type
-        kernel_type = st.selectbox(
-            "Select kernel for analysis",
-            ["Linear", "RBF", "Polynomial", "Kreĭn-Space"]
         )
         
-        # Compute kernel matrix
-        if kernel_type == "Kreĭn-Space":
-            pos_gamma = st.slider("Positive Component Gamma", 0.01, 2.0, 0.5, 0.01)
-            neg_weight = st.slider("Negative Component Weight", 0.0, 1.0, 0.3, 0.05)
-            
-            kernel_matrix = compute_krein_kernel_matrix(features, pos_gamma=pos_gamma, neg_weight=neg_weight)
-            compared_kernel = compute_kernel_matrix(features, "RBF", gamma=pos_gamma)
-        else:
-            if kernel_type == "RBF":
-                gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01)
-                kernel_params = {"gamma": gamma}
-            elif kernel_type == "Polynomial":
-                degree = st.slider("Degree", 1, 5, 3)
-                coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1)
-                kernel_params = {"degree": degree, "coef0": coef0}
-            else:  # Linear
-                kernel_params = {}
-            
-            kernel_matrix = compute_kernel_matrix(features, kernel_type, **kernel_params)
-            
-            # Compare with Kreĭn kernel
-            compared_kernel = compute_krein_kernel_matrix(features, pos_gamma=0.5, neg_weight=0.3)
-        
-        # Plot the kernel matrices
-        fig = plot_kernel_matrix(
-            kernel_matrix, 
-            compared_kernel, 
-            kernel_type, 
-            "Kreĭn-Space" if kernel_type != "Kreĭn-Space" else "RBF", 
-            labels
-        )
-        
-        st.plotly_chart(fig)
-        
-        # Apply kernel transformation for visualization
-        if kernel_type == "Kreĭn-Space":
-            transformed_features = apply_kernel_transformation(
-                features, 
-                kernel_type, 
-                pos_gamma=pos_gamma, 
-                neg_weight=neg_weight
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab3:
+        # Create a 2D heatmap of interaction classes
+        fig = go.Figure(data=go.Heatmap(
+            z=classes,
+            x=x,
+            y=y,
+            colorscale=[
+                [0, 'red'],
+                [0.5, 'blue'],
+                [1, 'green']
+            ],
+            showscale=True,
+            colorbar=dict(
+                title="Interaction Class",
+                tickvals=[0, 1, 2],
+                ticktext=["Antagonistic", "Additive", "Synergistic"]
             )
-        else:
-            transformed_features = apply_kernel_transformation(features, kernel_type, **kernel_params)
+        ))
         
-        # Create a scatter plot of the transformed data
-        fig = px.scatter(
-            x=transformed_features[:, 0],
-            y=transformed_features[:, 1],
-            color=exp_df["Classification"],
-            hover_name=[f"{a} + {b}" for a, b in zip(exp_df["Drug_A"], exp_df["Drug_B"])],
-            color_discrete_map={
-                "Synergistic": "green",
-                "Additive": "blue",
-                "Antagonistic": "red"
-            },
-            labels={
-                "x": "Transformed Dimension 1",
-                "y": "Transformed Dimension 2",
-                "color": "Interaction Type"
-            },
-            title=f"Drug Combinations after {kernel_type} Kernel Transformation"
+        fig.update_layout(
+            title="Drug Interaction Classification",
+            xaxis_title="Drug A Concentration",
+            yaxis_title="Drug B Concentration",
+            width=700,
+            height=700
         )
         
-        st.plotly_chart(fig)
+        # Add a point for the current selection
+        fig.add_trace(
+            go.Scatter(
+                x=[drug_a_conc],
+                y=[drug_b_conc],
+                mode='markers',
+                marker=dict(
+                    size=15,
+                    color='white',
+                    line=dict(
+                        color='black',
+                        width=2
+                    )
+                ),
+                name="Current Selection"
+            )
+        )
         
-        st.markdown(f"""
-        **Interpreting the Kernel Analysis**:
-        
-        The kernel matrix visualization shows pairwise similarities between drug combinations according to the selected kernel.
-        
-        The scatter plot shows how the {kernel_type} kernel transforms the data. Points that cluster together are considered similar by the kernel.
-        
-        Note how the Kreĭn-space kernel often provides better separation between different interaction types 
-        (synergistic, additive, antagonistic) because it can model both positive and negative similarities.
-        
-        This analysis helps identify patterns in drug combination effects that might not be apparent from 
-        raw experimental data, potentially revealing underlying mechanisms of action.
-        """)
-
-# Upload Your Data page
-elif page == "Upload Your Data":
-    st.header("Upload Your Data")
+        st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("""
-    Upload your own dataset to explore how different kernels transform your data. 
-    This can be particularly useful for analyzing your own antibiotic synergy experiments.
+    ### Connection to Kreĭn Space Kernels
     
-    **Requirements:**
-    - CSV file format
-    - Numerical features in columns
-    - Optional label/class column
+    The complex interactions between antibiotics demonstrate why Kreĭn space kernels are valuable for modeling antibiotic synergy:
+    
+    1. **Dual Nature of Interactions**: Antibiotics can interact both synergistically and antagonistically, which aligns with the positive and negative components of Kreĭn kernels.
+    
+    2. **Multiple Interaction Mechanisms**: Various mechanisms (cell wall disruption, protein synthesis inhibition, etc.) contribute differently to the overall effect. Kreĭn kernels can model these complex relationships.
+    
+    3. **Non-linear Responses**: Drug interactions often produce non-linear responses that cannot be captured by simple additive models. The indefinite nature of Kreĭn kernels allows for modeling such non-linearities.
+    
+    4. **Biological Pathway Interactions**: Some pathways enhance each other (positive interactions) while others interfere (negative interactions). Kreĭn kernels naturally represent this duality.
+    
+    By using Kreĭn kernels to analyze antibiotic combination data, researchers can uncover patterns that might be missed by traditional methods, potentially leading to the discovery of novel synergistic combinations for treating resistant infections.
+    """)
+
+# Page: Experimental Data
+elif page == "Experimental Data":
+    st.title("Experimental Data Analysis")
+    
+    st.markdown("""
+    ### Antibiotic Synergy Dataset
+    
+    This section demonstrates the application of kernel methods to real antibiotic synergy data. 
+    The dataset contains information about various antibiotic combinations and their synergistic effects.
     """)
     
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    # Get data from the database
+    drug_pairs_df = get_drug_pairs_as_dataframe()
     
-    if uploaded_file is not None:
-        try:
-            # Load and display data
-            data = pd.read_csv(uploaded_file)
-            st.subheader("Data Preview")
-            st.dataframe(data.head())
-            
-            # Ask for feature columns and label column
-            all_columns = data.columns.tolist()
-            
-            # Feature selection
-            if len(all_columns) > 2:
-                default_features = all_columns[:-1]  # Default: all but last column
-            else:
-                default_features = all_columns
-                
-            feature_cols = st.multiselect(
-                "Select feature columns",
-                options=all_columns,
-                default=default_features
+    # Display the data
+    st.dataframe(drug_pairs_df)
+    
+    # Plot synergy matrix
+    st.markdown("### Antibiotic Synergy Matrix")
+    
+    fig = plot_synergy_matrix(drug_pairs_df)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Kernel-based analysis
+    st.markdown("### Kernel-Based Analysis of Synergy Patterns")
+    
+    st.markdown("""
+    We can apply various kernel methods to analyze patterns in the synergy data. This helps identify 
+    antibiotics with similar synergy profiles or discover clusters of drug combinations with similar effects.
+    """)
+    
+    # Prepare data for kernel analysis
+    # Create a feature matrix where each row represents an antibiotic and columns represent its synergy 
+    # with other antibiotics
+    drugs = sorted(list(set(drug_pairs_df['Drug_A'].unique()) | set(drug_pairs_df['Drug_B'].unique())))
+    n_drugs = len(drugs)
+    
+    # Create drug to index mapping
+    drug_to_idx = {drug: i for i, drug in enumerate(drugs)}
+    
+    # Create synergy matrix
+    synergy_matrix = np.zeros((n_drugs, n_drugs))
+    
+    # Fill the matrix
+    for _, row in drug_pairs_df.iterrows():
+        i = drug_to_idx[row['Drug_A']]
+        j = drug_to_idx[row['Drug_B']]
+        synergy_matrix[i, j] = row['Synergy_Score']
+        synergy_matrix[j, i] = row['Synergy_Score']  # Make it symmetric
+    
+    # Feature matrix: each row is a drug, with its synergy profile as features
+    X_synergy = synergy_matrix
+    
+    # Select kernels for analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        kernel_type = st.selectbox(
+            "Select kernel type for analysis:",
+            ["linear", "rbf", "polynomial", "kreĭn"],
+            index=3
+        )
+    
+    with col2:
+        # Parameters based on selected kernel
+        if kernel_type == "rbf":
+            gamma = st.slider("Gamma parameter:", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+            kernel_params = {"gamma": gamma}
+        elif kernel_type == "polynomial":
+            degree = st.slider("Polynomial degree:", min_value=1, max_value=5, value=3, step=1)
+            kernel_params = {"degree": degree, "gamma": 1.0, "coef0": 1.0}
+        elif kernel_type == "kreĭn":
+            pos_gamma = st.slider("Positive component gamma:", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+            neg_weight = st.slider("Negative component weight:", min_value=0.1, max_value=1.0, value=0.3, step=0.1)
+            kernel_params = {"pos_gamma": pos_gamma, "neg_weight": neg_weight}
+        else:  # linear
+            kernel_params = {}
+    
+    # Compute kernel matrix
+    K = compute_kernel_matrix(X_synergy, kernel_type, **kernel_params)
+    
+    # Apply kernel transformation for visualization
+    try:
+        X_transformed = apply_kernel_transformation(X_synergy, kernel_type, **kernel_params)
+        
+        # Create a figure
+        fig = go.Figure()
+        
+        # Add scatter plot
+        fig.add_trace(
+            go.Scatter(
+                x=X_transformed[:, 0],
+                y=X_transformed[:, 1],
+                mode='markers+text',
+                marker=dict(size=15, color=np.arange(len(drugs)), colorscale='Viridis', showscale=False),
+                text=drugs,
+                textposition="top center",
+                hoverinfo="text"
+            )
+        )
+        
+        # Update layout
+        fig.update_layout(
+            title=f"Antibiotics Mapped with {kernel_type.capitalize()} Kernel",
+            xaxis_title="Dimension 1",
+            yaxis_title="Dimension 2",
+            height=600,
+            width=800
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("""
+        **Interpretation:** 
+        
+        The plot above shows antibiotics mapped to a 2D space based on their synergy profiles. 
+        Antibiotics that are close together in this space have similar synergy patterns with other antibiotics, 
+        suggesting they might have similar mechanisms of action or interact with similar pathways.
+        
+        This visualization can help identify:
+        - Clusters of antibiotics with similar synergy behavior
+        - Outliers that have unique synergy profiles
+        - Potential substitutions for antibiotics in combination therapies
+        """)
+        
+        # Display eigenspectrum
+        st.markdown("### Eigenspectrum Analysis")
+        
+        fig = plot_eigenspectrum(K, kernel_type.capitalize())
+        st.plotly_chart(fig, use_container_width=True)
+        
+        if kernel_type == "kreĭn":
+            st.markdown("""
+            The presence of both positive and negative eigenvalues in the Kreĭn kernel's eigenspectrum 
+            indicates that the synergy data contains both cooperative and competitive relationships. 
+            This indefinite structure can reveal complex patterns that positive definite kernels might miss.
+            """)
+        else:
+            st.markdown("""
+            The eigenspectrum above shows the distribution of eigenvalues for the kernel matrix. 
+            The magnitude of eigenvalues indicates the importance of different dimensions in the data.
+            """)
+    
+    except Exception as e:
+        st.error(f"Error in kernel transformation: {e}")
+        st.markdown("""
+        The transformation couldn't be computed. This might be due to:
+        - Numerical instability in the kernel matrix
+        - Insufficient data for a meaningful transformation
+        - Issues with the selected parameters
+        
+        Try adjusting the kernel parameters or selecting a different kernel type.
+        """)
+
+# Page: Save & Load Analysis
+elif page == "Save & Load Analysis":
+    st.title("Save & Load Analysis Results")
+    
+    # Create tabs for saving and loading
+    save_tab, load_tab = st.tabs(["Save New Analysis", "Load Saved Analysis"])
+    
+    with save_tab:
+        st.markdown("""
+        ### Save Your Analysis
+        
+        Save your current analysis settings and results to the database for future reference.
+        """)
+        
+        # Define data generation parameters
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            data_type = st.selectbox(
+                "Select data type:",
+                ["moons", "circles", "linearly_separable", "drug_response", "bacteria_markers"]
             )
             
-            # Label selection (optional)
-            label_col = st.selectbox(
-                "Select label column (optional)",
-                options=["None"] + all_columns,
-                index=0
+            n_samples = st.slider("Number of samples:", min_value=10, max_value=500, value=100, step=10)
+        
+        with col2:
+            kernel_type = st.selectbox(
+                "Select kernel type:",
+                ["linear", "rbf", "polynomial", "sigmoid", "kreĭn"]
             )
             
-            # Process data
-            if feature_cols:
-                X = data[feature_cols].values
+            # Parameters based on kernel type
+            if kernel_type == "rbf":
+                gamma = st.slider("Gamma:", min_value=0.01, max_value=5.0, value=1.0, step=0.1)
+                kernel_params = {"gamma": gamma}
+            
+            elif kernel_type == "polynomial":
+                degree = st.slider("Degree:", min_value=1, max_value=10, value=3, step=1)
+                gamma = st.slider("Gamma:", min_value=0.01, max_value=5.0, value=1.0, step=0.1)
+                coef0 = st.slider("Coef0:", min_value=0.0, max_value=5.0, value=1.0, step=0.1)
+                kernel_params = {"degree": degree, "gamma": gamma, "coef0": coef0}
+            
+            elif kernel_type == "sigmoid":
+                gamma = st.slider("Gamma:", min_value=0.01, max_value=5.0, value=1.0, step=0.1)
+                coef0 = st.slider("Coef0:", min_value=0.0, max_value=5.0, value=1.0, step=0.1)
+                kernel_params = {"gamma": gamma, "coef0": coef0}
+            
+            elif kernel_type == "kreĭn":
+                pos_gamma = st.slider("Positive component gamma:", min_value=0.01, max_value=5.0, value=0.5, step=0.1)
+                neg_weight = st.slider("Negative component weight:", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
+                kernel_params = {"pos_gamma": pos_gamma, "neg_weight": neg_weight}
                 
-                if label_col != "None" and label_col in data.columns:
-                    y = data[label_col].values
+            else:  # linear kernel
+                kernel_params = {}
+        
+        with col3:
+            noise = st.slider("Noise level:", min_value=0.0, max_value=1.0, value=0.1, step=0.05)
+            random_state = st.number_input("Random seed:", value=42, min_value=0, max_value=1000, step=1)
+            
+            st.markdown("### Analysis Information")
+            analysis_name = st.text_input("Analysis name:", value=f"{data_type}_{kernel_type}_analysis")
+            analysis_desc = st.text_area("Description:", value=f"Analysis of {data_type} data using {kernel_type} kernel")
+        
+        # Generate data
+        np.random.seed(random_state)
+        X, y = generate_sample_data(data_type, n_samples=n_samples, noise=noise)
+        
+        # Compute kernel matrix
+        K = compute_kernel_matrix(X, kernel_type, **kernel_params)
+        
+        # Apply transformation for visualization
+        X_transformed = apply_kernel_transformation(X, kernel_type, **kernel_params)
+        
+        # Plot transformed data
+        fig = plot_transformed_data(X, X_transformed, y, kernel_type.capitalize(), data_type.capitalize())
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Save button
+        if st.button("Save Analysis to Database"):
+            # Prepare data for saving
+            visualization_data = {
+                "data_type": data_type,
+                "n_samples": n_samples,
+                "noise": noise,
+                "random_state": random_state,
+                "X": X.tolist(),
+                "y": y.tolist(),
+                "X_transformed": X_transformed.tolist()
+            }
+            
+            # Current datetime
+            created_at = datetime.datetime.now().isoformat()
+            
+            # Save to database
+            result_id = save_analysis_result(
+                name=analysis_name,
+                description=analysis_desc,
+                kernel_type=kernel_type,
+                kernel_params=kernel_params,
+                visualization_data=visualization_data,
+                created_at=created_at
+            )
+            
+            st.success(f"Analysis saved with ID: {result_id}")
+    
+    with load_tab:
+        st.markdown("""
+        ### Load Saved Analysis
+        
+        View and explore previously saved analysis results.
+        """)
+        
+        # Get all saved analyses
+        analyses = get_all_analysis_results()
+        
+        if not analyses:
+            st.info("No saved analyses found. Create and save an analysis first.")
+        else:
+            # Convert to DataFrame for display
+            analyses_data = []
+            for analysis in analyses:
+                analyses_data.append({
+                    "ID": analysis.id,
+                    "Name": analysis.name,
+                    "Kernel Type": analysis.kernel_type,
+                    "Date Created": analysis.created_at,
+                    "Description": analysis.description
+                })
+            
+            analyses_df = pd.DataFrame(analyses_data)
+            
+            # Display analyses
+            st.dataframe(analyses_df)
+            
+            # Select analysis to load
+            analysis_id = st.selectbox(
+                "Select analysis to load:",
+                options=[a.id for a in analyses],
+                format_func=lambda x: f"ID {x}: {next((a.name for a in analyses if a.id == x), '')}"
+            )
+            
+            # Load selected analysis
+            if st.button("Load Selected Analysis"):
+                selected_analysis = get_analysis_result_by_id(analysis_id)
+                
+                if selected_analysis:
+                    st.markdown(f"### {selected_analysis.name}")
+                    st.markdown(f"**Description:** {selected_analysis.description}")
+                    st.markdown(f"**Kernel Type:** {selected_analysis.kernel_type}")
+                    st.markdown(f"**Created:** {selected_analysis.created_at}")
+                    
+                    # Display kernel parameters
+                    st.markdown("#### Kernel Parameters:")
+                    st.json(selected_analysis.kernel_params)
+                    
+                    # Extract visualization data
+                    vis_data = selected_analysis.visualization_data
+                    
+                    # Check if we have all required data
+                    if all(k in vis_data for k in ["data_type", "X", "y", "X_transformed"]):
+                        # Convert lists back to numpy arrays
+                        X = np.array(vis_data["X"])
+                        y = np.array(vis_data["y"])
+                        X_transformed = np.array(vis_data["X_transformed"])
+                        data_type = vis_data["data_type"]
+                        
+                        # Plot the transformed data
+                        fig = plot_transformed_data(
+                            X, X_transformed, y, 
+                            selected_analysis.kernel_type.capitalize(), 
+                            data_type.capitalize()
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("Visualization data is incomplete or in an unexpected format.")
                 else:
-                    y = np.zeros(X.shape[0])  # Dummy labels if not provided
-                
-                # Apply kernel transformation
-                st.subheader("Kernel Selection")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    kernel_type = st.selectbox(
-                        "Select kernel type",
-                        ["Linear", "RBF", "Polynomial", "Sigmoid", "Kreĭn-Space"],
-                        key="upload_kernel_type"
-                    )
-                    
-                    # Kernel parameters
-                    kernel_params = {}
-                    
-                    if kernel_type == "RBF":
-                        gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01, key="upload_gamma")
-                        kernel_params["gamma"] = gamma
-                    elif kernel_type == "Polynomial":
-                        degree = st.slider("Degree", 1, 5, 3, key="upload_degree")
-                        coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1, key="upload_coef0")
-                        kernel_params["degree"] = degree
-                        kernel_params["coef0"] = coef0
-                    elif kernel_type == "Sigmoid":
-                        gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01, key="upload_sigmoid_gamma")
-                        coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1, key="upload_sigmoid_coef0")
-                        kernel_params["gamma"] = gamma
-                        kernel_params["coef0"] = coef0
-                    elif kernel_type == "Kreĭn-Space":
-                        pos_gamma = st.slider("Positive Component Gamma", 0.01, 2.0, 0.5, 0.01, key="upload_krein_gamma")
-                        neg_weight = st.slider("Negative Component Weight", 0.0, 1.0, 0.3, 0.05, key="upload_krein_weight")
-                        kernel_params = {"pos_gamma": pos_gamma, "neg_weight": neg_weight}
-                
-                with col2:
-                    viz_type = st.radio(
-                        "Visualization type",
-                        ["Kernel Matrix", "Transformed Data"]
-                    )
-                
-                # Compute and visualize
-                if viz_type == "Kernel Matrix":
-                    st.subheader("Kernel Matrix Visualization")
-                    
-                    if kernel_type == "Kreĭn-Space":
-                        K = compute_krein_kernel_matrix(X, **kernel_params)
-                    else:
-                        K = compute_kernel_matrix(X, kernel_type, **kernel_params)
-                    
-                    # Display kernel matrix
-                    fig = plt.figure(figsize=(8, 6))
-                    plt.imshow(K, cmap='viridis')
-                    plt.colorbar(label='Similarity')
-                    plt.title(f'{kernel_type} Kernel Matrix')
-                    plt.tight_layout()
-                    st.pyplot(fig)
-                    
-                    # Add download button for kernel matrix
-                    buffer = io.BytesIO()
-                    np.savetxt(buffer, K, delimiter=',')
-                    buffer.seek(0)
-                    st.download_button(
-                        label="Download Kernel Matrix as CSV",
-                        data=buffer,
-                        file_name="kernel_matrix.csv",
-                        mime="text/csv"
-                    )
-                    
-                else:  # Transformed Data
-                    st.subheader("Transformed Data Visualization")
-                    
-                    if X.shape[1] > 2:
-                        st.info("Your data has more than 2 dimensions. Showing a 2D projection using t-SNE.")
-                    
-                    if kernel_type == "Kreĭn-Space":
-                        K = compute_krein_kernel_matrix(X, **kernel_params)
-                    else:
-                        K = compute_kernel_matrix(X, kernel_type, **kernel_params)
-                    
-                    # Use t-SNE to project the kernel matrix to 2D for visualization
-                    tsne = TSNE(n_components=2, random_state=42)
-                    K_embedded = tsne.fit_transform(K)
-                    
-                    # Display scatter plot
-                    fig = px.scatter(
-                        x=K_embedded[:, 0], 
-                        y=K_embedded[:, 1],
-                        color=y if label_col != "None" else None,
-                        labels={'x': 'Dimension 1', 'y': 'Dimension 2'},
-                        title=f'Kernel-transformed Data ({kernel_type})'
-                    )
-                    st.plotly_chart(fig)
-            else:
-                st.warning("Please select at least one feature column")
-        
-        except Exception as e:
-            st.error(f"Error processing data: {str(e)}")
-            st.info("Make sure your CSV file contains numerical data and is properly formatted.")
+                    st.error("Could not load the selected analysis.")
+
+# Initialize Streamlit app
+if __name__ == "__main__":
+    # Ensure database is initialized
+    init_db()
+    seed_database()
