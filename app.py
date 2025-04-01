@@ -212,9 +212,53 @@ elif page == "Kernel Types":
         - Analyzing pathway disruption patterns
         """)
         
-        # Simple graph visualization
-        st.image("https://miro.medium.com/max/1400/1*1wjSdB-FKC2_hFkwzBCuDQ.jpeg", 
-                 caption="Example of Graph Kernel Concept (Source: Medium)")
+        # Create a simple graph visualization
+        plt.figure(figsize=(6, 4))
+        
+        # Create a simple graph with nodes and edges
+        G_nodes = np.array([[0.1, 0.1], [0.5, 0.5], [0.9, 0.9], [0.1, 0.9], [0.9, 0.1]])
+        G_edges = [(0, 1), (1, 2), (3, 1), (1, 4)]
+        
+        # Plot the graph
+        plt.scatter(G_nodes[:, 0], G_nodes[:, 1], s=100, c='blue')
+        for i, j in G_edges:
+            plt.plot([G_nodes[i, 0], G_nodes[j, 0]], [G_nodes[i, 1], G_nodes[j, 1]], 'k-')
+            
+        plt.title("Simple Graph Structure")
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.axis('off')
+        
+        # Create a second graph with a different structure
+        plt.figure(figsize=(6, 4))
+        H_nodes = np.array([[0.1, 0.5], [0.3, 0.8], [0.5, 0.5], [0.7, 0.8], [0.9, 0.5]])
+        H_edges = [(0, 2), (1, 2), (2, 3), (2, 4)]
+        
+        # Plot the second graph
+        plt.scatter(H_nodes[:, 0], H_nodes[:, 1], s=100, c='green')
+        for i, j in H_edges:
+            plt.plot([H_nodes[i, 0], H_nodes[j, 0]], [H_nodes[i, 1], H_nodes[j, 1]], 'k-')
+            
+        plt.title("Another Graph Structure")
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.axis('off')
+        
+        # Display both graphs
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(plt.figure(1))
+        with col2:
+            st.pyplot(plt.figure(2))
+        
+        st.markdown("""
+        **Graph kernels** measure similarity between these network structures by comparing:
+        - Node patterns
+        - Connection patterns
+        - Subgraph structures
+        
+        This is ideal for comparing pathway networks in biological systems.
+        """)
         
         st.markdown("""
         *Note: Graph kernels compare similarities between network structures, which is particularly useful 
