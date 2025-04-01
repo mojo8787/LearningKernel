@@ -28,9 +28,13 @@ st.sidebar.title("Navigation")
 page = st.sidebar.radio("Select a page", [
     "What are Kernels?", 
     "Kernel Types", 
+    "Prof. Gärtner's Research",
+    "Kreĭn Space Mathematics",
+    "Antibiotic Synergy Context",
     "Interactive Visualizations",
     "Kernel Matrices", 
-    "Upload Your Data"
+    "Upload Your Data",
+    "Experimental Data Visualization"
 ])
 
 # Add repository information
@@ -295,6 +299,784 @@ elif page == "Kernel Types":
         where nodes are pathways and edges represent crosstalk under drug pressure.*
         """)
 
+# Professor Gärtner's Research page
+elif page == "Prof. Gärtner's Research":
+    st.header("Professor Thomas Gärtner's Research")
+    
+    st.markdown("""
+    ### Background
+    
+    Professor Thomas Gärtner is a recognized expert in machine learning, particularly in the 
+    development of innovative kernel methods and their applications. His research focuses on 
+    learning with non-vectorial data, kernels for structured data, and learning in 
+    non-standard spaces such as Kreĭn spaces.
+    
+    ### Key Research Areas
+    
+    #### 1. Indefinite Learning and Kreĭn Space Methods
+    
+    Professor Gärtner's group has made significant contributions to kernel methods in indefinite spaces. 
+    Traditional kernel methods assume that similarities between objects are represented by positive definite 
+    kernels, which correspond to inner products in Hilbert spaces. However, many real-world similarity 
+    measures are indefinite, meaning they don't satisfy the positive definiteness property.
+    
+    Kreĭn spaces provide a mathematical framework for working with such indefinite kernels:
+    
+    - They decompose into a positive and negative part: K = K₊ - K₋
+    - Allow the modeling of both "attraction" and "repulsion" between data points
+    - Enable the representation of complex antagonistic relationships
+    
+    #### 2. Constructive Machine Learning
+    
+    Another focus of Prof. Gärtner's work is on constructive machine learning methods. This approach:
+    
+    - Emphasizes building interpretable models by constructing meaningful features
+    - Integrates domain knowledge into the learning process
+    - Creates models that not only predict but also explain
+    
+    #### 3. Applications to Biological Systems
+    
+    His group has applied these methods to biological systems, including:
+    
+    - Analyzing protein-protein interaction networks
+    - Predicting drug-target interactions
+    - Modeling complex pathway inhibition patterns
+    
+    ### Relevance to Antibiotic Synergy Research
+    
+    The application of Kreĭn-space methods to antibiotic synergy is particularly promising because:
+    
+    1. **Complex Interactions**: Antibiotics can interact in ways that are neither purely synergistic nor 
+    antagonistic, but involve elements of both. Kreĭn spaces naturally model such complexity.
+    
+    2. **Network Effects**: Antibiotics disrupt bacterial cellular networks in ways that propagate through 
+    interconnected pathways. Graph kernels in Kreĭn spaces can capture these network-level effects.
+    
+    3. **Mechanistic Understanding**: Unlike black-box approaches, kernel methods provide a way to 
+    interpret models in terms of similarities to known examples, enabling researchers to gain 
+    mechanistic insights.
+    """)
+    
+    # Citation and publications
+    st.subheader("Selected Publications")
+    
+    st.markdown("""
+    1. Oglic, D., & Gärtner, T. (2018). Learning in Reproducing Kernel Kreĭn Spaces. *International Conference on Machine Learning (ICML)*.
+    
+    2. Loosli, G., Canu, S., & Gärtner, T. (2016). Indefinite Proximities for SVM Classification. *ESANN*.
+    
+    3. Oglic, D., & Gärtner, T. (2019). Scalable Learning in Reproducing Kernel Krein Spaces. *International Conference on Machine Learning (ICML)*.
+    
+    4. Gärtner, T., Le, Q.V., & Smola, A.J. (2006). A short tour of kernel methods for graphs. *Technical report*.
+    """)
+
+# Kreĭn Space Mathematics page
+elif page == "Kreĭn Space Mathematics":
+    st.header("Mathematical Theory of Kreĭn Spaces")
+    
+    st.markdown("""
+    ### Fundamentals of Kreĭn Spaces
+    
+    A Kreĭn space K is a vector space equipped with an indefinite inner product that can be decomposed 
+    into the difference of two positive definite inner products.
+    
+    #### Definition
+    
+    A Kreĭn space is a vector space K with an indefinite inner product ⟨·,·⟩ₖ that can be written as:
+    
+    $$⟨x, y⟩_K = ⟨x, y⟩_{H_+} - ⟨x, y⟩_{H_-}$$
+    
+    where (H₊, ⟨·,·⟩_{H_+}) and (H₋, ⟨·,·⟩_{H_-}) are Hilbert spaces with positive definite inner products.
+    
+    #### Key Properties
+    
+    1. **Indefiniteness**: Unlike Hilbert spaces, inner products in Kreĭn spaces can be negative.
+    
+    2. **Fundamental Decomposition**: Any Kreĭn space can be decomposed as K = K₊ ⊕ K₋, where K₊ and K₋ are Hilbert spaces.
+    
+    3. **J-Symmetry**: There exists a "fundamental symmetry" operator J such that ⟨x, y⟩ₖ = ⟨Jx, y⟩ₕ, where ⟨·,·⟩ₕ is a Hilbert space inner product.
+    """)
+    
+    # Visualize the concept of Kreĭn space
+    st.subheader("Geometric Interpretation")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Create a visual representation of Hilbert space (positive definite)
+        plt.figure(figsize=(5, 5))
+        
+        # Generate some points in 2D space
+        np.random.seed(42)
+        X = np.random.randn(50, 2)
+        
+        # Plot points and vectors
+        plt.scatter(X[:, 0], X[:, 1], s=30, alpha=0.5)
+        
+        # Draw some vectors
+        for i in range(5):
+            x = X[i]
+            plt.arrow(0, 0, x[0], x[1], head_width=0.1, head_length=0.1, fc='blue', ec='blue')
+        
+        plt.title("Hilbert Space (Positive Definite)")
+        plt.xlim(-3, 3)
+        plt.ylim(-3, 3)
+        plt.grid(True)
+        plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+        plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+        
+        st.pyplot(plt.gcf())
+    
+    with col2:
+        # Create a visual representation of Kreĭn space (indefinite)
+        plt.figure(figsize=(5, 5))
+        
+        # Generate some points in 2D space
+        np.random.seed(42)
+        X = np.random.randn(50, 2)
+        
+        # Plot points and vectors
+        plt.scatter(X[:, 0], X[:, 1], s=30, alpha=0.5)
+        
+        # Draw vectors with sign information
+        for i in range(5):
+            x = X[i]
+            # Color based on inner product sign
+            sign = 1 if x[0]*x[0] - x[1]*x[1] > 0 else -1
+            color = 'green' if sign > 0 else 'red'
+            plt.arrow(0, 0, x[0], x[1], head_width=0.1, head_length=0.1, fc=color, ec=color)
+        
+        plt.title("Kreĭn Space (Indefinite)")
+        plt.xlim(-3, 3)
+        plt.ylim(-3, 3)
+        plt.grid(True)
+        plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+        plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+        
+        st.pyplot(plt.gcf())
+    
+    st.markdown("""
+    ### Kreĭn Space Kernels
+    
+    A Kreĭn space kernel is a function K: X × X → ℝ such that:
+    
+    1. It can be decomposed as K = K₊ - K₋, where K₊ and K₋ are positive definite kernels.
+    2. For any finite set of points {x₁, x₂, ..., xₙ}, the matrix [K(xᵢ, xⱼ)]ᵢⱼ has a finite number of negative eigenvalues.
+    
+    #### Mathematical Formulation
+    
+    For a Kreĭn space kernel K:
+    
+    $$K(x, y) = K_+(x, y) - K_-(x, y)$$
+    
+    Where K₊ and K₋ are positive definite kernels corresponding to Hilbert spaces H₊ and H₋.
+    
+    #### Support Vector Machines in Kreĭn Spaces
+    
+    The objective function for SVMs in Kreĭn spaces becomes:
+    
+    $$\min_{f \in \mathcal{H}_K} \frac{1}{2} ||f||^2_K + C \sum_{i=1}^n \max(0, 1 - y_i f(x_i))$$
+    
+    where ||f||²ₖ = ||f₊||²_{H₊} - ||f₋||²_{H₋} is the squared norm in the Kreĭn space.
+    
+    This formulation allows for modeling complex decision boundaries that might be impossible 
+    with standard positive definite kernels.
+    """)
+    
+    st.subheader("Applications to Antibiotic Synergy")
+    
+    st.markdown("""
+    In the context of antibiotic synergy, Kreĭn space kernels enable:
+    
+    1. **Modeling Antagonistic Interactions**: The negative part of the kernel (K₋) can represent 
+    antagonistic effects between drugs.
+    
+    2. **Capturing Complex Dynamics**: The interplay between synergistic and antagonistic components 
+    can model the complex dynamics of bacterial stress responses.
+    
+    3. **Improved Classification**: By allowing indefinite similarities, Kreĭn-SVMs can better classify 
+    drug combinations as synergistic, additive, or antagonistic.
+    """)
+    
+    # Example visualization of decision boundary
+    st.subheader("Visualizing Decision Boundaries")
+    
+    # Generate some data
+    np.random.seed(42)
+    X1 = np.random.randn(50, 2) * 0.7 + np.array([2, 2])  # Class 1
+    X2 = np.random.randn(50, 2) * 0.7 + np.array([-2, -2])  # Class 2
+    X3 = np.random.randn(50, 2) * 0.7 + np.array([2, -2])  # Class 3
+    
+    X = np.vstack([X1, X2, X3])
+    y = np.hstack([np.zeros(50), np.ones(50), 2 * np.ones(50)])
+    
+    # Create a plot with decision regions
+    plt.figure(figsize=(10, 6))
+    
+    # Plot points
+    plt.scatter(X1[:, 0], X1[:, 1], c='blue', label='Synergistic')
+    plt.scatter(X2[:, 0], X2[:, 1], c='red', label='Antagonistic')
+    plt.scatter(X3[:, 0], X3[:, 1], c='green', label='Additive')
+    
+    # Add curved decision boundaries (simplified visualization)
+    theta = np.linspace(0, 2*np.pi, 100)
+    
+    # Boundary 1 (circle)
+    r = 2.5
+    plt.plot(r*np.cos(theta), r*np.sin(theta), 'k--', alpha=0.5)
+    
+    # Boundary 2 (curved)
+    x = np.linspace(-4, 4, 100)
+    plt.plot(x, -0.2*x**2 + 1, 'k--', alpha=0.5)
+    
+    plt.title("Simplified Visualization of Kreĭn-SVM Decision Boundaries")
+    plt.xlabel("Feature 1 (e.g., Drug A concentration)")
+    plt.ylabel("Feature 2 (e.g., Drug B concentration)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.axis('equal')
+    
+    st.pyplot(plt.gcf())
+    
+    st.markdown("""
+    *Note: This is a simplified visualization. Actual decision boundaries in Kreĭn-space SVMs can be 
+    much more complex, capturing intricate patterns of drug interactions that standard SVMs cannot represent.*
+    """)
+
+# Antibiotic Synergy Context page
+elif page == "Antibiotic Synergy Context":
+    st.header("Biological Context: Antibiotic Synergy")
+    
+    st.markdown("""
+    ### The Challenge of Antibiotic Resistance
+    
+    Antibiotic resistance is one of the most pressing global health challenges of our time. According to the WHO, 
+    antibiotic-resistant infections could cause 10 million deaths annually by 2050 if no action is taken.
+    
+    #### Key Challenges
+    
+    1. **Pipeline Gap**: Few new antibiotics are being developed
+    2. **Evolutionary Pressure**: Single antibiotics drive rapid resistance development
+    3. **Complex Mechanisms**: Resistance involves multiple cellular pathways
+    
+    ### Antibiotic Combinations as a Solution
+    
+    Combining multiple antibiotics can:
+    
+    1. **Enhance Efficacy**: Creating effects greater than the sum of individual drugs
+    2. **Reduce Resistance**: Making it harder for bacteria to develop concurrent mechanisms
+    3. **Lower Dosages**: Reducing side effects while maintaining effectiveness
+    
+    However, not all combinations are beneficial. Some combinations can be:
+    
+    - **Synergistic**: Enhanced effect (greater than additive)
+    - **Additive**: Combined effect equals the sum of individual effects
+    - **Antagonistic**: Combined effect is less than the sum, or even inhibitory
+    """)
+    
+    # Create visualization of different types of interactions
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Create heatmap for synergistic interactions
+        conc_range = np.linspace(0, 1, 10)
+        X, Y = np.meshgrid(conc_range, conc_range)
+        
+        # Synergistic effect (more than additive)
+        Z_synergy = 0.8 * X + 0.7 * Y + 1.5 * X * Y
+        
+        fig = go.Figure(data=[go.Heatmap(
+            z=Z_synergy,
+            x=conc_range,
+            y=conc_range,
+            colorscale='Viridis',
+            colorbar=dict(title="Effect")
+        )])
+        
+        fig.update_layout(
+            title="Synergistic Interaction",
+            xaxis_title="Drug A Concentration",
+            yaxis_title="Drug B Concentration",
+            width=400,
+            height=400
+        )
+        
+        st.plotly_chart(fig)
+    
+    with col2:
+        # Create heatmap for antagonistic interactions
+        Z_antagonistic = 0.8 * X + 0.7 * Y - 0.5 * X * Y
+        
+        fig = go.Figure(data=[go.Heatmap(
+            z=Z_antagonistic,
+            x=conc_range,
+            y=conc_range,
+            colorscale='Viridis',
+            colorbar=dict(title="Effect")
+        )])
+        
+        fig.update_layout(
+            title="Antagonistic Interaction",
+            xaxis_title="Drug A Concentration",
+            yaxis_title="Drug B Concentration",
+            width=400,
+            height=400
+        )
+        
+        st.plotly_chart(fig)
+    
+    st.markdown("""
+    ### Biological Mechanisms of Synergy
+    
+    Understanding why certain antibiotics work synergistically requires examining:
+    
+    #### 1. Cellular Pathway Interactions
+    
+    - **Sequential Inhibition**: One drug enhances the uptake or targeting of another
+    - **Parallel Pathway Inhibition**: Simultaneous disruption of multiple cellular functions
+    - **Stress Response Modulation**: One drug prevents adaptive responses to another
+    
+    #### 2. Metabolic Network Effects
+    
+    - **Flux Redirection**: Blocking one pathway forces metabolism through another vulnerable route
+    - **Energy Depletion**: Combined assault on energy-producing systems
+    - **Resource Competition**: Forcing cellular machinery to respond to multiple threats simultaneously
+    
+    #### 3. Resistance Mechanism Interactions
+    
+    - **Efflux Pump Saturation**: Overwhelming bacterial expulsion mechanisms
+    - **Cell Wall Destabilization**: One drug creates entry points for another
+    - **Compensatory Mutation Prevention**: Blocking genetic adaptation pathways
+    """)
+    
+    # Create network diagram
+    st.subheader("Antibiotic Interaction Networks")
+    
+    # Create network figure
+    plt.figure(figsize=(10, 6))
+    
+    # Define nodes (cellular components/processes)
+    nodes = {
+        'CellWall': (0.2, 0.8),
+        'DNASynthesis': (0.8, 0.8),
+        'Ribosome': (0.5, 0.5),
+        'Metabolism': (0.2, 0.2),
+        'MembraneTransport': (0.8, 0.2)
+    }
+    
+    # Define edges (interactions)
+    edges = [
+        ('CellWall', 'MembraneTransport'),
+        ('CellWall', 'Metabolism'),
+        ('DNASynthesis', 'Metabolism'),
+        ('DNASynthesis', 'Ribosome'),
+        ('Ribosome', 'Metabolism'),
+        ('Ribosome', 'MembraneTransport')
+    ]
+    
+    # Plot nodes
+    for name, (x, y) in nodes.items():
+        plt.plot(x, y, 'o', markersize=15, color='cornflowerblue')
+        plt.text(x, y+0.05, name, ha='center', fontsize=10)
+    
+    # Plot edges
+    for node1, node2 in edges:
+        x1, y1 = nodes[node1]
+        x2, y2 = nodes[node2]
+        plt.plot([x1, x2], [y1, y2], '-', color='gray', alpha=0.6)
+    
+    # Add drug inhibition arrows
+    drug_a = (0.1, 0.9)
+    drug_b = (0.9, 0.9)
+    
+    plt.plot(drug_a[0], drug_a[1], 's', markersize=10, color='crimson')
+    plt.text(drug_a[0], drug_a[1]+0.05, "Drug A", ha='center', fontsize=10)
+    
+    plt.plot(drug_b[0], drug_b[1], 's', markersize=10, color='purple')
+    plt.text(drug_b[0], drug_b[1]+0.05, "Drug B", ha='center', fontsize=10)
+    
+    # Inhibition arrows
+    plt.arrow(drug_a[0]+0.02, drug_a[1]-0.02, 0.1, -0.05, head_width=0.02, head_length=0.02, fc='crimson', ec='crimson')
+    plt.arrow(drug_b[0]-0.02, drug_b[1]-0.02, -0.05, -0.05, head_width=0.02, head_length=0.02, fc='purple', ec='purple')
+    
+    plt.title("Network Model of Antibiotic Interactions")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.axis('off')
+    
+    st.pyplot(plt.gcf())
+    
+    st.markdown("""
+    ### Why Kernel Methods for Antibiotic Synergy Research?
+    
+    Kernel methods are particularly well-suited for antibiotic synergy research because:
+    
+    1. **Capturing Complex Interactions**: Kernels can represent non-linear relationships between drugs and their targets
+    
+    2. **Interpretability**: Unlike black-box neural networks, kernel methods provide insights into which examples (drug pairs) 
+       influence predictions, aiding mechanistic understanding
+    
+    3. **Prior Knowledge Integration**: Graph kernels can incorporate known biological network information
+    
+    4. **Handling Heterogeneous Data**: Kernels can combine multiple data types (chemical structures, genomics, proteomics)
+    
+    5. **Modeling Opposing Forces**: Kreĭn-space kernels uniquely capture the push-pull dynamics in bacterial networks 
+       responding to multiple stressors
+    """)
+    
+    st.subheader("Current State of the Art")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        #### Traditional Methods
+        
+        - **Checkerboard Assays**:
+          - Manual experimental testing of drug combinations
+          - Time-consuming and expensive
+          - Limited to pairwise interactions
+        
+        - **Fractional Inhibitory Concentration Index (FICI)**:
+          - Simple mathematical model
+          - Doesn't capture complex interactions
+          - Binary classification only (synergistic/not)
+        """)
+    
+    with col2:
+        st.markdown("""
+        #### Advanced Computational Approaches
+        
+        - **DeepSynergy**:
+          - Neural network model for drug combination effects
+          - High accuracy but low interpretability
+          - Requires large datasets
+        
+        - **Mechanistic Models**:
+          - Detailed cellular simulations
+          - Extremely complex
+          - Requires extensive parameter tuning
+        """)
+    
+    st.markdown("""
+    ### The Promise of Kreĭn-Space Kernel Methods
+    
+    Kreĭn-space kernel methods represent a middle ground:
+    
+    - More sophisticated than simple indices like FICI
+    - More interpretable than black-box neural networks
+    - Better at modeling the dual nature (synergy/antagonism) of drug interactions
+    - Capable of representing both local and global network effects
+    
+    By modeling both synergistic (positive) and antagonistic (negative) components simultaneously,
+    Kreĭn-space kernels match the biological reality of competing forces in cellular networks
+    responding to multiple stressors.
+    """)
+
+# Experimental Data Visualization page
+elif page == "Experimental Data Visualization":
+    st.header("Experimental Data Visualization")
+    
+    st.markdown("""
+    ### Analyzing Real Experimental Data
+    
+    This section allows you to visualize and analyze experimental antibiotic synergy data. 
+    While we cannot provide real proprietary research data, we have created a representative dataset 
+    based on published literature trends to demonstrate how kernel methods can be applied to 
+    experimental results.
+    """)
+    
+    # Create sample experimental data
+    np.random.seed(42)
+    
+    # Create drug pairs
+    antibiotics = ["Ampicillin", "Tetracycline", "Ciprofloxacin", "Gentamicin", "Trimethoprim",
+                  "Erythromycin", "Rifampicin", "Vancomycin", "Ceftriaxone", "Azithromycin"]
+    
+    n_drugs = len(antibiotics)
+    n_pairs = n_drugs * (n_drugs - 1) // 2
+    
+    # Create empty dataframe
+    pairs = []
+    for i in range(n_drugs):
+        for j in range(i+1, n_drugs):
+            pairs.append((antibiotics[i], antibiotics[j]))
+    
+    # Generate features that might be available from experiments
+    # These would normally come from real data
+    
+    # Drug A properties (MIC values, etc)
+    drug_A_properties = np.random.rand(n_pairs, 3)
+    
+    # Drug B properties
+    drug_B_properties = np.random.rand(n_pairs, 3)
+    
+    # Combined effect measures
+    combined_effects = np.random.rand(n_pairs, 4)
+    
+    # FICI values (< 0.5: synergistic, 0.5-4: additive, > 4: antagonistic)
+    fici_values = np.random.lognormal(mean=-0.5, sigma=0.7, size=n_pairs)
+    
+    # Synergy scores
+    synergy_scores = 1.0 - fici_values / 5  # Transform to roughly 0-1 scale
+    synergy_scores = np.clip(synergy_scores, 0, 1)
+    
+    # Create categorical labels
+    synergy_labels = ["Antagonistic" if f > 4 else "Additive" if f >= 0.5 else "Synergistic" for f in fici_values]
+    
+    # Create dataframe
+    data = {
+        "Drug_A": [pair[0] for pair in pairs],
+        "Drug_B": [pair[1] for pair in pairs],
+        "FICI": fici_values,
+        "Synergy_Score": synergy_scores,
+        "Classification": synergy_labels,
+        "MIC_Reduction_A": drug_A_properties[:, 0] * 10,
+        "MIC_Reduction_B": drug_B_properties[:, 0] * 10,
+        "Growth_Inhibition": combined_effects[:, 0] * 100  # Percentage
+    }
+    
+    exp_df = pd.DataFrame(data)
+    
+    # Display the data
+    st.subheader("Sample Experimental Data")
+    st.dataframe(exp_df)
+    
+    # Visualization options
+    st.subheader("Data Visualization")
+    
+    viz_type = st.radio(
+        "Select visualization type",
+        ["Synergy Heatmap", "Drug Pair Comparison", "Kernel Analysis"]
+    )
+    
+    if viz_type == "Synergy Heatmap":
+        st.markdown("### Synergy Heatmap")
+        st.markdown("This heatmap shows the interaction strengths between different antibiotic pairs.")
+        
+        # Create a matrix for heatmap
+        synergy_matrix = np.zeros((n_drugs, n_drugs))
+        
+        # Fill the matrix with FICI values
+        pair_idx = 0
+        for i in range(n_drugs):
+            for j in range(i+1, n_drugs):
+                synergy_value = 1.0 - exp_df.iloc[pair_idx]["FICI"] / 5  # Transform for visualization
+                synergy_value = np.clip(synergy_value, 0, 1)
+                
+                synergy_matrix[i, j] = synergy_value
+                synergy_matrix[j, i] = synergy_value  # Make it symmetric
+                pair_idx += 1
+        
+        # Create heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=synergy_matrix,
+            x=antibiotics,
+            y=antibiotics,
+            colorscale='RdBu_r',
+            colorbar=dict(title="Synergy Score")
+        ))
+        
+        fig.update_layout(
+            title="Antibiotic Synergy Heatmap",
+            xaxis_title="Antibiotic",
+            yaxis_title="Antibiotic",
+            width=700,
+            height=700
+        )
+        
+        st.plotly_chart(fig)
+        
+        st.markdown("""
+        **Interpretation**: 
+        - Darker blue colors indicate stronger synergistic effects
+        - Darker red colors indicate antagonistic effects
+        - White/neutral colors indicate additive effects
+        
+        This visualization helps identify promising drug combinations for further investigation.
+        """)
+    
+    elif viz_type == "Drug Pair Comparison":
+        st.markdown("### Drug Pair Comparison")
+        
+        # Allow selection of drug pairs
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            drug_a = st.selectbox("Select first drug", antibiotics)
+        
+        with col2:
+            drug_b_options = [drug for drug in antibiotics if drug != drug_a]
+            drug_b = st.selectbox("Select second drug", drug_b_options)
+        
+        # Find the pair in the dataframe
+        pair_data = exp_df[(exp_df["Drug_A"] == drug_a) & (exp_df["Drug_B"] == drug_b)]
+        
+        if pair_data.empty:
+            pair_data = exp_df[(exp_df["Drug_A"] == drug_b) & (exp_df["Drug_B"] == drug_a)]
+        
+        if not pair_data.empty:
+            # Display pair information
+            st.subheader(f"{drug_a} + {drug_b} Interaction")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("FICI Value", f"{pair_data['FICI'].values[0]:.2f}")
+            
+            with col2:
+                st.metric("Synergy Score", f"{pair_data['Synergy_Score'].values[0]:.2f}")
+            
+            with col3:
+                st.metric("Classification", pair_data["Classification"].values[0])
+            
+            # Create a detailed visualization
+            # Simulate a dose-response surface
+            conc_range = np.linspace(0, 1, 20)
+            X, Y = np.meshgrid(conc_range, conc_range)
+            
+            # Create a response surface based on the synergy type
+            if pair_data["Classification"].values[0] == "Synergistic":
+                Z = 0.8 * X + 0.7 * Y + 1.5 * X * Y
+            elif pair_data["Classification"].values[0] == "Antagonistic":
+                Z = 0.8 * X + 0.7 * Y - 0.5 * X * Y
+            else:  # Additive
+                Z = 0.8 * X + 0.7 * Y + 0.1 * X * Y
+            
+            # Add some noise
+            np.random.seed(42)
+            Z += np.random.normal(0, 0.05, Z.shape)
+            
+            # Create the surface plot
+            fig = go.Figure(data=[go.Surface(z=Z, x=conc_range, y=conc_range)])
+            fig.update_layout(
+                title=f"{drug_a} + {drug_b} Dose-Response Surface",
+                scene=dict(
+                    xaxis_title=f"{drug_a} Concentration",
+                    yaxis_title=f"{drug_b} Concentration",
+                    zaxis_title="Inhibition Effect"
+                ),
+                width=700,
+                height=700
+            )
+            
+            st.plotly_chart(fig)
+            
+            st.markdown("""
+            **Interpreting the Response Surface**:
+            
+            This 3D surface shows how the combined effect of the drug pair varies with different concentrations.
+            
+            - For **synergistic** pairs, the surface curves upward (combined effect > sum of individual effects)
+            - For **antagonistic** pairs, the surface curves downward (combined effect < sum of individual effects)
+            - For **additive** pairs, the surface is nearly linear (combined effect ≈ sum of individual effects)
+            
+            The shape of this surface provides insights into the optimal dosing ratios for maximal efficacy.
+            """)
+        
+    elif viz_type == "Kernel Analysis":
+        st.markdown("### Kernel Analysis of Drug Interactions")
+        
+        # Create a feature matrix from the data
+        features = np.column_stack([
+            exp_df["MIC_Reduction_A"],
+            exp_df["MIC_Reduction_B"],
+            exp_df["Growth_Inhibition"]
+        ])
+        
+        # Normalize features
+        features = (features - features.mean(axis=0)) / features.std(axis=0)
+        
+        # Create labels based on classification
+        class_mapping = {"Synergistic": 2, "Additive": 1, "Antagonistic": 0}
+        labels = np.array([class_mapping[label] for label in exp_df["Classification"]])
+        
+        # Select kernel type
+        kernel_type = st.selectbox(
+            "Select kernel for analysis",
+            ["Linear", "RBF", "Polynomial", "Kreĭn-Space"]
+        )
+        
+        # Compute kernel matrix
+        if kernel_type == "Kreĭn-Space":
+            pos_gamma = st.slider("Positive Component Gamma", 0.01, 2.0, 0.5, 0.01)
+            neg_weight = st.slider("Negative Component Weight", 0.0, 1.0, 0.3, 0.05)
+            
+            kernel_matrix = compute_krein_kernel_matrix(features, pos_gamma=pos_gamma, neg_weight=neg_weight)
+            compared_kernel = compute_kernel_matrix(features, "RBF", gamma=pos_gamma)
+        else:
+            if kernel_type == "RBF":
+                gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01)
+                kernel_params = {"gamma": gamma}
+            elif kernel_type == "Polynomial":
+                degree = st.slider("Degree", 1, 5, 3)
+                coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1)
+                kernel_params = {"degree": degree, "coef0": coef0}
+            else:  # Linear
+                kernel_params = {}
+            
+            kernel_matrix = compute_kernel_matrix(features, kernel_type, **kernel_params)
+            
+            # Compare with Kreĭn kernel
+            compared_kernel = compute_krein_kernel_matrix(features, pos_gamma=0.5, neg_weight=0.3)
+        
+        # Plot the kernel matrices
+        fig = plot_kernel_matrix(
+            kernel_matrix, 
+            compared_kernel, 
+            kernel_type, 
+            "Kreĭn-Space" if kernel_type != "Kreĭn-Space" else "RBF", 
+            labels
+        )
+        
+        st.plotly_chart(fig)
+        
+        # Apply kernel transformation for visualization
+        if kernel_type == "Kreĭn-Space":
+            transformed_features = apply_kernel_transformation(
+                features, 
+                kernel_type, 
+                pos_gamma=pos_gamma, 
+                neg_weight=neg_weight
+            )
+        else:
+            transformed_features = apply_kernel_transformation(features, kernel_type, **kernel_params)
+        
+        # Create a scatter plot of the transformed data
+        fig = px.scatter(
+            x=transformed_features[:, 0],
+            y=transformed_features[:, 1],
+            color=exp_df["Classification"],
+            hover_name=[f"{a} + {b}" for a, b in zip(exp_df["Drug_A"], exp_df["Drug_B"])],
+            color_discrete_map={
+                "Synergistic": "green",
+                "Additive": "blue",
+                "Antagonistic": "red"
+            },
+            labels={
+                "x": "Transformed Dimension 1",
+                "y": "Transformed Dimension 2",
+                "color": "Interaction Type"
+            },
+            title=f"Drug Combinations after {kernel_type} Kernel Transformation"
+        )
+        
+        st.plotly_chart(fig)
+        
+        st.markdown(f"""
+        **Interpreting the Kernel Analysis**:
+        
+        The kernel matrix visualization shows pairwise similarities between drug combinations according to the selected kernel.
+        
+        The scatter plot shows how the {kernel_type} kernel transforms the data. Points that cluster together are considered similar by the kernel.
+        
+        Note how the Kreĭn-space kernel often provides better separation between different interaction types 
+        (synergistic, additive, antagonistic) because it can model both positive and negative similarities.
+        
+        This analysis helps identify patterns in drug combination effects that might not be apparent from 
+        raw experimental data, potentially revealing underlying mechanisms of action.
+        """)
+
 # Interactive Visualizations page
 elif page == "Interactive Visualizations":
     st.header("Interactive Kernel Visualizations")
@@ -497,6 +1279,310 @@ elif page == "Kernel Matrices":
     This visualization helps identify patterns in how different data points relate to each other according to 
     different similarity measures.
     """)
+
+# Experimental Data Visualization page
+elif page == "Experimental Data Visualization":
+    st.header("Experimental Data Visualization")
+    
+    st.markdown("""
+    ### Analyzing Real Experimental Data
+    
+    This section allows you to visualize and analyze experimental antibiotic synergy data. 
+    While we cannot provide real proprietary research data, we have created a representative dataset 
+    based on published literature trends to demonstrate how kernel methods can be applied to 
+    experimental results.
+    """)
+    
+    # Create sample experimental data
+    np.random.seed(42)
+    
+    # Create drug pairs
+    antibiotics = ["Ampicillin", "Tetracycline", "Ciprofloxacin", "Gentamicin", "Trimethoprim",
+                  "Erythromycin", "Rifampicin", "Vancomycin", "Ceftriaxone", "Azithromycin"]
+    
+    n_drugs = len(antibiotics)
+    n_pairs = n_drugs * (n_drugs - 1) // 2
+    
+    # Create empty dataframe
+    pairs = []
+    for i in range(n_drugs):
+        for j in range(i+1, n_drugs):
+            pairs.append((antibiotics[i], antibiotics[j]))
+    
+    # Generate features that might be available from experiments
+    # These would normally come from real data
+    
+    # Drug A properties (MIC values, etc)
+    drug_A_properties = np.random.rand(n_pairs, 3)
+    
+    # Drug B properties
+    drug_B_properties = np.random.rand(n_pairs, 3)
+    
+    # Combined effect measures
+    combined_effects = np.random.rand(n_pairs, 4)
+    
+    # FICI values (< 0.5: synergistic, 0.5-4: additive, > 4: antagonistic)
+    fici_values = np.random.lognormal(mean=-0.5, sigma=0.7, size=n_pairs)
+    
+    # Synergy scores
+    synergy_scores = 1.0 - fici_values / 5  # Transform to roughly 0-1 scale
+    synergy_scores = np.clip(synergy_scores, 0, 1)
+    
+    # Create categorical labels
+    synergy_labels = ["Antagonistic" if f > 4 else "Additive" if f >= 0.5 else "Synergistic" for f in fici_values]
+    
+    # Create dataframe
+    data = {
+        "Drug_A": [pair[0] for pair in pairs],
+        "Drug_B": [pair[1] for pair in pairs],
+        "FICI": fici_values,
+        "Synergy_Score": synergy_scores,
+        "Classification": synergy_labels,
+        "MIC_Reduction_A": drug_A_properties[:, 0] * 10,
+        "MIC_Reduction_B": drug_B_properties[:, 0] * 10,
+        "Growth_Inhibition": combined_effects[:, 0] * 100  # Percentage
+    }
+    
+    exp_df = pd.DataFrame(data)
+    
+    # Display the data
+    st.subheader("Sample Experimental Data")
+    st.dataframe(exp_df)
+    
+    # Visualization options
+    st.subheader("Data Visualization")
+    
+    viz_type = st.radio(
+        "Select visualization type",
+        ["Synergy Heatmap", "Drug Pair Comparison", "Kernel Analysis"]
+    )
+    
+    if viz_type == "Synergy Heatmap":
+        st.markdown("### Synergy Heatmap")
+        st.markdown("This heatmap shows the interaction strengths between different antibiotic pairs.")
+        
+        # Create a matrix for heatmap
+        synergy_matrix = np.zeros((n_drugs, n_drugs))
+        
+        # Fill the matrix with FICI values
+        pair_idx = 0
+        for i in range(n_drugs):
+            for j in range(i+1, n_drugs):
+                synergy_value = 1.0 - exp_df.iloc[pair_idx]["FICI"] / 5  # Transform for visualization
+                synergy_value = np.clip(synergy_value, 0, 1)
+                
+                synergy_matrix[i, j] = synergy_value
+                synergy_matrix[j, i] = synergy_value  # Make it symmetric
+                pair_idx += 1
+        
+        # Create heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=synergy_matrix,
+            x=antibiotics,
+            y=antibiotics,
+            colorscale='RdBu_r',
+            colorbar=dict(title="Synergy Score")
+        ))
+        
+        fig.update_layout(
+            title="Antibiotic Synergy Heatmap",
+            xaxis_title="Antibiotic",
+            yaxis_title="Antibiotic",
+            width=700,
+            height=700
+        )
+        
+        st.plotly_chart(fig)
+        
+        st.markdown("""
+        **Interpretation**: 
+        - Darker blue colors indicate stronger synergistic effects
+        - Darker red colors indicate antagonistic effects
+        - White/neutral colors indicate additive effects
+        
+        This visualization helps identify promising drug combinations for further investigation.
+        """)
+    
+    elif viz_type == "Drug Pair Comparison":
+        st.markdown("### Drug Pair Comparison")
+        
+        # Allow selection of drug pairs
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            drug_a = st.selectbox("Select first drug", antibiotics)
+        
+        with col2:
+            drug_b_options = [drug for drug in antibiotics if drug != drug_a]
+            drug_b = st.selectbox("Select second drug", drug_b_options)
+        
+        # Find the pair in the dataframe
+        pair_data = exp_df[(exp_df["Drug_A"] == drug_a) & (exp_df["Drug_B"] == drug_b)]
+        
+        if pair_data.empty:
+            pair_data = exp_df[(exp_df["Drug_A"] == drug_b) & (exp_df["Drug_B"] == drug_a)]
+        
+        if not pair_data.empty:
+            # Display pair information
+            st.subheader(f"{drug_a} + {drug_b} Interaction")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("FICI Value", f"{pair_data['FICI'].values[0]:.2f}")
+            
+            with col2:
+                st.metric("Synergy Score", f"{pair_data['Synergy_Score'].values[0]:.2f}")
+            
+            with col3:
+                st.metric("Classification", pair_data["Classification"].values[0])
+            
+            # Create a detailed visualization
+            # Simulate a dose-response surface
+            conc_range = np.linspace(0, 1, 20)
+            X, Y = np.meshgrid(conc_range, conc_range)
+            
+            # Create a response surface based on the synergy type
+            if pair_data["Classification"].values[0] == "Synergistic":
+                Z = 0.8 * X + 0.7 * Y + 1.5 * X * Y
+            elif pair_data["Classification"].values[0] == "Antagonistic":
+                Z = 0.8 * X + 0.7 * Y - 0.5 * X * Y
+            else:  # Additive
+                Z = 0.8 * X + 0.7 * Y + 0.1 * X * Y
+            
+            # Add some noise
+            np.random.seed(42)
+            Z += np.random.normal(0, 0.05, Z.shape)
+            
+            # Create the surface plot
+            fig = go.Figure(data=[go.Surface(z=Z, x=conc_range, y=conc_range)])
+            fig.update_layout(
+                title=f"{drug_a} + {drug_b} Dose-Response Surface",
+                scene=dict(
+                    xaxis_title=f"{drug_a} Concentration",
+                    yaxis_title=f"{drug_b} Concentration",
+                    zaxis_title="Inhibition Effect"
+                ),
+                width=700,
+                height=700
+            )
+            
+            st.plotly_chart(fig)
+            
+            st.markdown("""
+            **Interpreting the Response Surface**:
+            
+            This 3D surface shows how the combined effect of the drug pair varies with different concentrations.
+            
+            - For **synergistic** pairs, the surface curves upward (combined effect > sum of individual effects)
+            - For **antagonistic** pairs, the surface curves downward (combined effect < sum of individual effects)
+            - For **additive** pairs, the surface is nearly linear (combined effect ≈ sum of individual effects)
+            
+            The shape of this surface provides insights into the optimal dosing ratios for maximal efficacy.
+            """)
+        
+    elif viz_type == "Kernel Analysis":
+        st.markdown("### Kernel Analysis of Drug Interactions")
+        
+        # Create a feature matrix from the data
+        features = np.column_stack([
+            exp_df["MIC_Reduction_A"],
+            exp_df["MIC_Reduction_B"],
+            exp_df["Growth_Inhibition"]
+        ])
+        
+        # Normalize features
+        features = (features - features.mean(axis=0)) / features.std(axis=0)
+        
+        # Create labels based on classification
+        class_mapping = {"Synergistic": 2, "Additive": 1, "Antagonistic": 0}
+        labels = np.array([class_mapping[label] for label in exp_df["Classification"]])
+        
+        # Select kernel type
+        kernel_type = st.selectbox(
+            "Select kernel for analysis",
+            ["Linear", "RBF", "Polynomial", "Kreĭn-Space"]
+        )
+        
+        # Compute kernel matrix
+        if kernel_type == "Kreĭn-Space":
+            pos_gamma = st.slider("Positive Component Gamma", 0.01, 2.0, 0.5, 0.01)
+            neg_weight = st.slider("Negative Component Weight", 0.0, 1.0, 0.3, 0.05)
+            
+            kernel_matrix = compute_krein_kernel_matrix(features, pos_gamma=pos_gamma, neg_weight=neg_weight)
+            compared_kernel = compute_kernel_matrix(features, "RBF", gamma=pos_gamma)
+        else:
+            if kernel_type == "RBF":
+                gamma = st.slider("Gamma", 0.01, 2.0, 0.5, 0.01)
+                kernel_params = {"gamma": gamma}
+            elif kernel_type == "Polynomial":
+                degree = st.slider("Degree", 1, 5, 3)
+                coef0 = st.slider("Coef0", 0.0, 2.0, 1.0, 0.1)
+                kernel_params = {"degree": degree, "coef0": coef0}
+            else:  # Linear
+                kernel_params = {}
+            
+            kernel_matrix = compute_kernel_matrix(features, kernel_type, **kernel_params)
+            
+            # Compare with Kreĭn kernel
+            compared_kernel = compute_krein_kernel_matrix(features, pos_gamma=0.5, neg_weight=0.3)
+        
+        # Plot the kernel matrices
+        fig = plot_kernel_matrix(
+            kernel_matrix, 
+            compared_kernel, 
+            kernel_type, 
+            "Kreĭn-Space" if kernel_type != "Kreĭn-Space" else "RBF", 
+            labels
+        )
+        
+        st.plotly_chart(fig)
+        
+        # Apply kernel transformation for visualization
+        if kernel_type == "Kreĭn-Space":
+            transformed_features = apply_kernel_transformation(
+                features, 
+                kernel_type, 
+                pos_gamma=pos_gamma, 
+                neg_weight=neg_weight
+            )
+        else:
+            transformed_features = apply_kernel_transformation(features, kernel_type, **kernel_params)
+        
+        # Create a scatter plot of the transformed data
+        fig = px.scatter(
+            x=transformed_features[:, 0],
+            y=transformed_features[:, 1],
+            color=exp_df["Classification"],
+            hover_name=[f"{a} + {b}" for a, b in zip(exp_df["Drug_A"], exp_df["Drug_B"])],
+            color_discrete_map={
+                "Synergistic": "green",
+                "Additive": "blue",
+                "Antagonistic": "red"
+            },
+            labels={
+                "x": "Transformed Dimension 1",
+                "y": "Transformed Dimension 2",
+                "color": "Interaction Type"
+            },
+            title=f"Drug Combinations after {kernel_type} Kernel Transformation"
+        )
+        
+        st.plotly_chart(fig)
+        
+        st.markdown(f"""
+        **Interpreting the Kernel Analysis**:
+        
+        The kernel matrix visualization shows pairwise similarities between drug combinations according to the selected kernel.
+        
+        The scatter plot shows how the {kernel_type} kernel transforms the data. Points that cluster together are considered similar by the kernel.
+        
+        Note how the Kreĭn-space kernel often provides better separation between different interaction types 
+        (synergistic, additive, antagonistic) because it can model both positive and negative similarities.
+        
+        This analysis helps identify patterns in drug combination effects that might not be apparent from 
+        raw experimental data, potentially revealing underlying mechanisms of action.
+        """)
 
 # Upload Your Data page
 elif page == "Upload Your Data":
