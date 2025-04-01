@@ -67,7 +67,8 @@ def get_feature_names(data_type):
 
 # Create the sidebar
 st.sidebar.title("KreinSynergy")
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Antibiotic-synergy-testing.png/320px-Antibiotic-synergy-testing.png", use_column_width=True)
+# Using a different image that doesn't require external access
+st.sidebar.markdown("## Interactive Exploration of Indefinite Kernels")
 
 # Navigation
 st.sidebar.markdown("## Navigation")
@@ -611,7 +612,7 @@ elif page == "Kreĭn Space Mathematics":
         K_neg_norm = K_neg / np.abs(K_neg).max() if np.abs(K_neg).max() > 0 else K_neg
         D_neg = 1 - K_neg_norm
         from sklearn.manifold import TSNE
-        tsne = TSNE(n_components=2, metric='precomputed', perplexity=min(30, X_demo.shape[0]-1))
+        tsne = TSNE(n_components=2, metric='precomputed', perplexity=min(30, X_demo.shape[0]-1), init='random')
         X_neg_transformed = tsne.fit_transform(D_neg)
         
         # Transform with Kreĭn kernel
@@ -756,8 +757,11 @@ elif page == "Kreĭn Space Mathematics":
         Kreĭn kernels provide a natural mathematical framework to model these complex biological phenomena.
         """)
         
-        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Mark_Krein.jpg/250px-Mark_Krein.jpg", 
-                 caption="Mark Krein (1907-1989), mathematician who contributed significantly to the theory of indefinite inner product spaces")
+        st.markdown("""
+        **Mark Krein (1907-1989)** was a mathematician who contributed significantly 
+        to the theory of indefinite inner product spaces. His work laid the foundation 
+        for many modern applications in mathematical physics and machine learning.
+        """)
         
         st.markdown("""
         **Further Reading:**

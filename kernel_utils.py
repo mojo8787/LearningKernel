@@ -92,7 +92,7 @@ def apply_kernel_transformation(X, kernel_type, **params):
     
     # Use t-SNE to reduce to 2D for visualization
     # t-SNE works well with pairwise similarity/distance matrices
-    tsne = TSNE(n_components=2, metric='precomputed', perplexity=min(30, X.shape[0]-1))
+    tsne = TSNE(n_components=2, metric='precomputed', perplexity=min(30, X.shape[0]-1), init='random')
     
     # t-SNE works with distances, so convert similarities to distances
     # We use a heuristic: D = 1 - normalized(K)
