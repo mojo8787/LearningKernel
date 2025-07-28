@@ -4,6 +4,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![GitHub release](https://img.shields.io/github/v/release/mojo8787/LearningKernel.svg)](https://github.com/mojo8787/LearningKernel/releases)
 [![ORCID](https://img.shields.io/badge/ORCID-0000--0003--2070--2811-green.svg)](https://orcid.org/0000-0003-2070-2811)
+[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://streamlit.io/)
 
 ## About
 
