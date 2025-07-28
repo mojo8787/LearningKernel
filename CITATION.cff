@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+title: "KreinSynergy: Interactive Exploration of Indefinite Kernels for Antibiotic Synergy"
+version: "1.0.0"
+message: |
+  If you use this software, please cite it as below. A DOI will be automatically
+  inserted by Zenodo upon upload.
+license: "MIT"
+authors:
+  - family-names: "Bellah"
+    given-names: "Almotasem"
+    email: "motasem.youniss@gmail.com"
+    affiliation: "Brno, Czech Republic"
+repository-code: "https://github.com/YOUR-USERNAME/KreinSynergy" 
