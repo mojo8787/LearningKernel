@@ -1,4 +1,8 @@
 # KreinSynergy: Interactive Exploration of Indefinite Kernels for Antibiotic Synergy Research
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.16547498.svg)](https://doi.org/10.5281/zenodo.16547498)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![GitHub release](https://img.shields.io/github/v/release/mojo8787/LearningKernel.svg)](https://github.com/mojo8787/LearningKernel/releases)
 
 ## About
 
