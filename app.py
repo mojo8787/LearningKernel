@@ -1045,11 +1045,14 @@ elif page == "Experimental Data":
     # Display the data
     st.dataframe(drug_pairs_df)
     
-    # Plot synergy matrix
+    # Plot synergy matrix (only if we have data)
     st.markdown("### Antibiotic Synergy Matrix")
     
-    fig = plot_synergy_matrix(drug_pairs_df)
-    st.plotly_chart(fig, use_container_width=True)
+    if len(drug_pairs_df) > 0:
+        fig = plot_synergy_matrix(drug_pairs_df)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No drug pair data available. Run `python init_db.py` to seed the database with sample data.")
     
     # Kernel-based analysis
     st.markdown("### Kernel-Based Analysis of Synergy Patterns")
@@ -1059,128 +1062,129 @@ elif page == "Experimental Data":
     antibiotics with similar synergy profiles or discover clusters of drug combinations with similar effects.
     """)
     
-    # Prepare data for kernel analysis
-    # Create a feature matrix where each row represents an antibiotic and columns represent its synergy 
-    # with other antibiotics
+    # Prepare data for kernel analysis (requires at least 1 drug pair)
     drugs = sorted(list(set(drug_pairs_df['Drug_A'].unique()) | set(drug_pairs_df['Drug_B'].unique())))
     n_drugs = len(drugs)
     
-    # Create drug to index mapping
-    drug_to_idx = {drug: i for i, drug in enumerate(drugs)}
-    
-    # Create synergy matrix
-    synergy_matrix = np.zeros((n_drugs, n_drugs))
-    
-    # Fill the matrix
-    for _, row in drug_pairs_df.iterrows():
-        i = drug_to_idx[row['Drug_A']]
-        j = drug_to_idx[row['Drug_B']]
-        synergy_matrix[i, j] = row['Synergy_Score']
-        synergy_matrix[j, i] = row['Synergy_Score']  # Make it symmetric
-    
-    # Feature matrix: each row is a drug, with its synergy profile as features
-    X_synergy = synergy_matrix
-    
-    # Select kernels for analysis
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        kernel_type = st.selectbox(
-            "Select kernel type for analysis:",
-            ["linear", "rbf", "polynomial", "kreĭn"],
-            index=3
-        )
-    
-    with col2:
-        # Parameters based on selected kernel
-        if kernel_type == "rbf":
-            gamma = st.slider("Gamma parameter:", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
-            kernel_params = {"gamma": gamma}
-        elif kernel_type == "polynomial":
-            degree = st.slider("Polynomial degree:", min_value=1, max_value=5, value=3, step=1)
-            kernel_params = {"degree": degree, "gamma": 1.0, "coef0": 1.0}
-        elif kernel_type == "kreĭn":
-            pos_gamma = st.slider("Positive component gamma:", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
-            neg_weight = st.slider("Negative component weight:", min_value=0.1, max_value=1.0, value=0.3, step=0.1)
-            kernel_params = {"pos_gamma": pos_gamma, "neg_weight": neg_weight}
-        else:  # linear
-            kernel_params = {}
-    
-    # Compute kernel matrix
-    K = compute_kernel_matrix(X_synergy, kernel_type, **kernel_params)
-    
-    # Apply kernel transformation for visualization
-    try:
-        X_transformed = apply_kernel_transformation(X_synergy, kernel_type, **kernel_params)
+    if n_drugs < 2:
+        st.warning("Kernel-based analysis requires at least 2 antibiotics in the dataset. Run `python init_db.py` to seed the database with sample data.")
+    else:
+        # Create drug to index mapping
+        drug_to_idx = {drug: i for i, drug in enumerate(drugs)}
         
-        # Create a figure
-        fig = go.Figure()
+        # Create synergy matrix
+        synergy_matrix = np.zeros((n_drugs, n_drugs))
         
-        # Add scatter plot
-        fig.add_trace(
-            go.Scatter(
-                x=X_transformed[:, 0],
-                y=X_transformed[:, 1],
-                mode='markers+text',
-                marker=dict(size=15, color=np.arange(len(drugs)), colorscale='Viridis', showscale=False),
-                text=drugs,
-                textposition="top center",
-                hoverinfo="text"
+        # Fill the matrix
+        for _, row in drug_pairs_df.iterrows():
+            i = drug_to_idx[row['Drug_A']]
+            j = drug_to_idx[row['Drug_B']]
+            synergy_matrix[i, j] = row['Synergy_Score']
+            synergy_matrix[j, i] = row['Synergy_Score']  # Make it symmetric
+        
+        # Feature matrix: each row is a drug, with its synergy profile as features
+        X_synergy = synergy_matrix
+        
+        # Select kernels for analysis
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            kernel_type = st.selectbox(
+                "Select kernel type for analysis:",
+                ["linear", "rbf", "polynomial", "kreĭn"],
+                index=3
             )
-        )
         
-        # Update layout
-        fig.update_layout(
-            title=f"Antibiotics Mapped with {kernel_type.capitalize()} Kernel",
-            xaxis_title="Dimension 1",
-            yaxis_title="Dimension 2",
-            height=600,
-            width=800
-        )
+        with col2:
+            # Parameters based on selected kernel
+            if kernel_type == "rbf":
+                gamma = st.slider("Gamma parameter:", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+                kernel_params = {"gamma": gamma}
+            elif kernel_type == "polynomial":
+                degree = st.slider("Polynomial degree:", min_value=1, max_value=5, value=3, step=1)
+                kernel_params = {"degree": degree, "gamma": 1.0, "coef0": 1.0}
+            elif kernel_type == "kreĭn":
+                pos_gamma = st.slider("Positive component gamma:", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+                neg_weight = st.slider("Negative component weight:", min_value=0.1, max_value=1.0, value=0.3, step=0.1)
+                kernel_params = {"pos_gamma": pos_gamma, "neg_weight": neg_weight}
+            else:  # linear
+                kernel_params = {}
         
-        st.plotly_chart(fig, use_container_width=True)
+        # Compute kernel matrix
+        K = compute_kernel_matrix(X_synergy, kernel_type, **kernel_params)
         
-        st.markdown("""
-        **Interpretation:** 
-        
-        The plot above shows antibiotics mapped to a 2D space based on their synergy profiles. 
-        Antibiotics that are close together in this space have similar synergy patterns with other antibiotics, 
-        suggesting they might have similar mechanisms of action or interact with similar pathways.
-        
-        This visualization can help identify:
-        - Clusters of antibiotics with similar synergy behavior
-        - Outliers that have unique synergy profiles
-        - Potential substitutions for antibiotics in combination therapies
-        """)
-        
-        # Display eigenspectrum
-        st.markdown("### Eigenspectrum Analysis")
-        
-        fig = plot_eigenspectrum(K, kernel_type.capitalize())
-        st.plotly_chart(fig, use_container_width=True)
-        
-        if kernel_type == "kreĭn":
+        # Apply kernel transformation for visualization
+        try:
+            X_transformed = apply_kernel_transformation(X_synergy, kernel_type, **kernel_params)
+            
+            # Create a figure
+            fig = go.Figure()
+            
+            # Add scatter plot
+            fig.add_trace(
+                go.Scatter(
+                    x=X_transformed[:, 0],
+                    y=X_transformed[:, 1],
+                    mode='markers+text',
+                    marker=dict(size=15, color=np.arange(len(drugs)), colorscale='Viridis', showscale=False),
+                    text=drugs,
+                    textposition="top center",
+                    hoverinfo="text"
+                )
+            )
+            
+            # Update layout
+            fig.update_layout(
+                title=f"Antibiotics Mapped with {kernel_type.capitalize()} Kernel",
+                xaxis_title="Dimension 1",
+                yaxis_title="Dimension 2",
+                height=600,
+                width=800
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
             st.markdown("""
-            The presence of both positive and negative eigenvalues in the Kreĭn kernel's eigenspectrum 
-            indicates that the synergy data contains both cooperative and competitive relationships. 
-            This indefinite structure can reveal complex patterns that positive definite kernels might miss.
+            **Interpretation:** 
+            
+            The plot above shows antibiotics mapped to a 2D space based on their synergy profiles. 
+            Antibiotics that are close together in this space have similar synergy patterns with other antibiotics, 
+            suggesting they might have similar mechanisms of action or interact with similar pathways.
+            
+            This visualization can help identify:
+            - Clusters of antibiotics with similar synergy behavior
+            - Outliers that have unique synergy profiles
+            - Potential substitutions for antibiotics in combination therapies
             """)
-        else:
-            st.markdown("""
-            The eigenspectrum above shows the distribution of eigenvalues for the kernel matrix. 
-            The magnitude of eigenvalues indicates the importance of different dimensions in the data.
-            """)
-    
-    except Exception as e:
-        st.error(f"Error in kernel transformation: {e}")
-        st.markdown("""
-        The transformation couldn't be computed. This might be due to:
-        - Numerical instability in the kernel matrix
-        - Insufficient data for a meaningful transformation
-        - Issues with the selected parameters
+            
+            # Display eigenspectrum
+            st.markdown("### Eigenspectrum Analysis")
+            
+            fig = plot_eigenspectrum(K, kernel_type.capitalize())
+            st.plotly_chart(fig, use_container_width=True)
+            
+            if kernel_type == "kreĭn":
+                st.markdown("""
+                The presence of both positive and negative eigenvalues in the Kreĭn kernel's eigenspectrum 
+                indicates that the synergy data contains both cooperative and competitive relationships. 
+                This indefinite structure can reveal complex patterns that positive definite kernels might miss.
+                """)
+            else:
+                st.markdown("""
+                The eigenspectrum above shows the distribution of eigenvalues for the kernel matrix. 
+                The magnitude of eigenvalues indicates the importance of different dimensions in the data.
+                """)
         
-        Try adjusting the kernel parameters or selecting a different kernel type.
-        """)
+        except Exception as e:
+            st.error(f"Error in kernel transformation: {e}")
+            st.markdown("""
+            The transformation couldn't be computed. This might be due to:
+            - Numerical instability in the kernel matrix
+            - Insufficient data for a meaningful transformation
+            - Issues with the selected parameters
+            
+            Try adjusting the kernel parameters or selecting a different kernel type.
+            """)
 
 # Page: Save & Load Analysis
 elif page == "Save & Load Analysis":

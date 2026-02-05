@@ -4,10 +4,12 @@ import numpy as np
 from sqlalchemy import create_engine, Column, Integer, String, Float, Text, ForeignKey, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import aliased
 import json
 
 # Get the database URL from environment variables
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
+# Fall back to SQLite for local development when PostgreSQL is not configured
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///kreinsynergy.db')
 
 # Create SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
@@ -161,15 +163,17 @@ def get_all_drug_pairs():
 def get_drug_pairs_as_dataframe():
     session = get_session()
     try:
-        # Query drug pairs with joined antibiotic data
+        # Use aliases to join antibiotics table twice (for drug_a and drug_b)
+        AntibioticA = aliased(Antibiotic)
+        AntibioticB = aliased(Antibiotic)
         result = session.query(
             DrugPair,
-            Antibiotic.name.label('drug_a_name'),
-            Antibiotic.name.label('drug_b_name')
+            AntibioticA.name.label('drug_a_name'),
+            AntibioticB.name.label('drug_b_name')
         ).join(
-            Antibiotic, DrugPair.drug_a_id == Antibiotic.id
+            AntibioticA, DrugPair.drug_a_id == AntibioticA.id
         ).join(
-            Antibiotic, DrugPair.drug_b_id == Antibiotic.id, isouter=True
+            AntibioticB, DrugPair.drug_b_id == AntibioticB.id, isouter=True
         ).all()
         
         # Convert to dataframe
